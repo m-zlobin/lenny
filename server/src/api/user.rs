@@ -13,8 +13,8 @@ use crate::{
   websocket::{
     server::{CaptchaItem, CheckCaptcha, JoinUserRoom, SendAllMessage, SendUserRoomMessage},
     UserOperation,
-    WebsocketInfo,
   },
+  ConnectionId,
   LemmyContext,
   LemmyError,
 };
@@ -302,7 +302,7 @@ impl Perform for Login {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    _websocket_info: Option<WebsocketInfo>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<LoginResponse, LemmyError> {
     let data: &Login = &self;
 
@@ -337,7 +337,7 @@ impl Perform for Register {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    websocket_info: Option<WebsocketInfo>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<LoginResponse, LemmyError> {
     let data: &Register = &self;
 
@@ -356,27 +356,22 @@ impl Perform for Register {
 
     // If its not the admin, check the captcha
     if !data.admin && Settings::get().captcha.enabled {
-      match websocket_info {
-        Some(ws) => {
-          let check = ws
-            .chatserver
-            .send(CheckCaptcha {
-              uuid: data
-                .captcha_uuid
-                .to_owned()
-                .unwrap_or_else(|| "".to_string()),
-              answer: data
-                .captcha_answer
-                .to_owned()
-                .unwrap_or_else(|| "".to_string()),
-            })
-            .await?;
-          if !check {
-            return Err(APIError::err("captcha_incorrect").into());
-          }
-        }
-        None => return Err(APIError::err("captcha_incorrect").into()),
-      };
+      let check = context
+        .chat_server()
+        .send(CheckCaptcha {
+          uuid: data
+            .captcha_uuid
+            .to_owned()
+            .unwrap_or_else(|| "".to_string()),
+          answer: data
+            .captcha_answer
+            .to_owned()
+            .unwrap_or_else(|| "".to_string()),
+        })
+        .await?;
+      if !check {
+        return Err(APIError::err("captcha_incorrect").into());
+      }
     }
 
     // Make sure there are no admins
@@ -512,8 +507,8 @@ impl Perform for GetCaptcha {
 
   async fn perform(
     &self,
-    _context: &Data<LemmyContext>,
-    websocket_info: Option<WebsocketInfo>,
+    context: &Data<LemmyContext>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<Self::Response, LemmyError> {
     let captcha_settings = Settings::get().captcha;
 
@@ -544,9 +539,8 @@ impl Perform for GetCaptcha {
       expires: naive_now() + Duration::minutes(10), // expires in 10 minutes
     };
 
-    if let Some(ws) = websocket_info {
-      ws.chatserver.do_send(captcha_item);
-    }
+    // Stores the captcha item on the queue
+    context.chat_server().do_send(captcha_item);
 
     Ok(GetCaptchaResponse {
       ok: Some(CaptchaResponse { png, uuid, wav }),
@@ -561,7 +555,7 @@ impl Perform for SaveUserSettings {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    _websocket_info: Option<WebsocketInfo>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<LoginResponse, LemmyError> {
     let data: &SaveUserSettings = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
@@ -687,7 +681,7 @@ impl Perform for GetUserDetails {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    _websocket_info: Option<WebsocketInfo>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<GetUserDetailsResponse, LemmyError> {
     let data: &GetUserDetails = &self;
     let user = get_user_from_jwt_opt(&data.auth, context.pool()).await?;
@@ -785,7 +779,7 @@ impl Perform for AddAdmin {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    websocket_info: Option<WebsocketInfo>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<AddAdminResponse, LemmyError> {
     let data: &AddAdmin = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
@@ -824,13 +818,11 @@ impl Perform for AddAdmin {
 
     let res = AddAdminResponse { admins };
 
-    if let Some(ws) = websocket_info {
-      ws.chatserver.do_send(SendAllMessage {
-        op: UserOperation::AddAdmin,
-        response: res.clone(),
-        my_id: ws.id,
-      });
-    }
+    context.chat_server().do_send(SendAllMessage {
+      op: UserOperation::AddAdmin,
+      response: res.clone(),
+      websocket_id,
+    });
 
     Ok(res)
   }
@@ -843,7 +835,7 @@ impl Perform for BanUser {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    websocket_info: Option<WebsocketInfo>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<BanUserResponse, LemmyError> {
     let data: &BanUser = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
@@ -906,13 +898,11 @@ impl Perform for BanUser {
       banned: data.ban,
     };
 
-    if let Some(ws) = websocket_info {
-      ws.chatserver.do_send(SendAllMessage {
-        op: UserOperation::BanUser,
-        response: res.clone(),
-        my_id: ws.id,
-      });
-    }
+    context.chat_server().do_send(SendAllMessage {
+      op: UserOperation::BanUser,
+      response: res.clone(),
+      websocket_id,
+    });
 
     Ok(res)
   }
@@ -925,7 +915,7 @@ impl Perform for GetReplies {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    _websocket_info: Option<WebsocketInfo>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<GetRepliesResponse, LemmyError> {
     let data: &GetReplies = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
@@ -957,7 +947,7 @@ impl Perform for GetUserMentions {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    _websocket_info: Option<WebsocketInfo>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<GetUserMentionsResponse, LemmyError> {
     let data: &GetUserMentions = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
@@ -989,7 +979,7 @@ impl Perform for MarkUserMentionAsRead {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    _websocket_info: Option<WebsocketInfo>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<UserMentionResponse, LemmyError> {
     let data: &MarkUserMentionAsRead = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
@@ -1031,7 +1021,7 @@ impl Perform for MarkAllAsRead {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    _websocket_info: Option<WebsocketInfo>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<GetRepliesResponse, LemmyError> {
     let data: &MarkAllAsRead = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
@@ -1083,7 +1073,7 @@ impl Perform for DeleteAccount {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    _websocket_info: Option<WebsocketInfo>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<LoginResponse, LemmyError> {
     let data: &DeleteAccount = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
@@ -1120,7 +1110,7 @@ impl Perform for PasswordReset {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    _websocket_info: Option<WebsocketInfo>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<PasswordResetResponse, LemmyError> {
     let data: &PasswordReset = &self;
 
@@ -1168,7 +1158,7 @@ impl Perform for PasswordChange {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    _websocket_info: Option<WebsocketInfo>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<LoginResponse, LemmyError> {
     let data: &PasswordChange = &self;
 
@@ -1209,7 +1199,7 @@ impl Perform for CreatePrivateMessage {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    websocket_info: Option<WebsocketInfo>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<PrivateMessageResponse, LemmyError> {
     let data: &CreatePrivateMessage = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
@@ -1288,14 +1278,12 @@ impl Perform for CreatePrivateMessage {
 
     let res = PrivateMessageResponse { message };
 
-    if let Some(ws) = websocket_info {
-      ws.chatserver.do_send(SendUserRoomMessage {
-        op: UserOperation::CreatePrivateMessage,
-        response: res.clone(),
-        recipient_id: recipient_user.id,
-        my_id: ws.id,
-      });
-    }
+    context.chat_server().do_send(SendUserRoomMessage {
+      op: UserOperation::CreatePrivateMessage,
+      response: res.clone(),
+      recipient_id,
+      websocket_id,
+    });
 
     Ok(res)
   }
@@ -1308,7 +1296,7 @@ impl Perform for EditPrivateMessage {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    websocket_info: Option<WebsocketInfo>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<PrivateMessageResponse, LemmyError> {
     let data: &EditPrivateMessage = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
@@ -1348,14 +1336,12 @@ impl Perform for EditPrivateMessage {
 
     let res = PrivateMessageResponse { message };
 
-    if let Some(ws) = websocket_info {
-      ws.chatserver.do_send(SendUserRoomMessage {
-        op: UserOperation::EditPrivateMessage,
-        response: res.clone(),
-        recipient_id,
-        my_id: ws.id,
-      });
-    }
+    context.chat_server().do_send(SendUserRoomMessage {
+      op: UserOperation::EditPrivateMessage,
+      response: res.clone(),
+      recipient_id,
+      websocket_id,
+    });
 
     Ok(res)
   }
@@ -1368,7 +1354,7 @@ impl Perform for DeletePrivateMessage {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    websocket_info: Option<WebsocketInfo>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<PrivateMessageResponse, LemmyError> {
     let data: &DeletePrivateMessage = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
@@ -1413,14 +1399,12 @@ impl Perform for DeletePrivateMessage {
 
     let res = PrivateMessageResponse { message };
 
-    if let Some(ws) = websocket_info {
-      ws.chatserver.do_send(SendUserRoomMessage {
-        op: UserOperation::DeletePrivateMessage,
-        response: res.clone(),
-        recipient_id,
-        my_id: ws.id,
-      });
-    }
+    context.chat_server().do_send(SendUserRoomMessage {
+      op: UserOperation::DeletePrivateMessage,
+      response: res.clone(),
+      recipient_id,
+      websocket_id,
+    });
 
     Ok(res)
   }
@@ -1433,7 +1417,7 @@ impl Perform for MarkPrivateMessageAsRead {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    websocket_info: Option<WebsocketInfo>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<PrivateMessageResponse, LemmyError> {
     let data: &MarkPrivateMessageAsRead = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
@@ -1471,14 +1455,12 @@ impl Perform for MarkPrivateMessageAsRead {
 
     let res = PrivateMessageResponse { message };
 
-    if let Some(ws) = websocket_info {
-      ws.chatserver.do_send(SendUserRoomMessage {
-        op: UserOperation::MarkPrivateMessageAsRead,
-        response: res.clone(),
-        recipient_id,
-        my_id: ws.id,
-      });
-    }
+    context.chat_server().do_send(SendUserRoomMessage {
+      op: UserOperation::MarkPrivateMessageAsRead,
+      response: res.clone(),
+      recipient_id,
+      websocket_id,
+    });
 
     Ok(res)
   }
@@ -1491,7 +1473,7 @@ impl Perform for GetPrivateMessages {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    _websocket_info: Option<WebsocketInfo>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<PrivateMessagesResponse, LemmyError> {
     let data: &GetPrivateMessages = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
@@ -1520,18 +1502,16 @@ impl Perform for UserJoin {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    websocket_info: Option<WebsocketInfo>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<UserJoinResponse, LemmyError> {
     let data: &UserJoin = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
 
-    if let Some(ws) = websocket_info {
-      if let Some(id) = ws.id {
-        ws.chatserver.do_send(JoinUserRoom {
-          user_id: user.id,
-          id,
-        });
-      }
+    if let Some(ws_id) = websocket_id {
+      context.chat_server().do_send(JoinUserRoom {
+        user_id: user.id,
+        id: ws_id,
+      });
     }
 
     Ok(UserJoinResponse { user_id: user.id })

@@ -13,8 +13,8 @@ use crate::{
   websocket::{
     server::{GetUsersOnline, SendAllMessage},
     UserOperation,
-    WebsocketInfo,
   },
+  ConnectionId,
   LemmyContext,
   LemmyError,
 };
@@ -165,7 +165,7 @@ impl Perform for ListCategories {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    _websocket_info: Option<WebsocketInfo>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<ListCategoriesResponse, LemmyError> {
     let _data: &ListCategories = &self;
 
@@ -183,7 +183,7 @@ impl Perform for GetModlog {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    _websocket_info: Option<WebsocketInfo>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<GetModlogResponse, LemmyError> {
     let data: &GetModlog = &self;
 
@@ -257,7 +257,7 @@ impl Perform for CreateSite {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    _websocket_info: Option<WebsocketInfo>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<SiteResponse, LemmyError> {
     let data: &CreateSite = &self;
 
@@ -295,7 +295,7 @@ impl Perform for EditSite {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    websocket_info: Option<WebsocketInfo>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<SiteResponse, LemmyError> {
     let data: &EditSite = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
@@ -329,13 +329,11 @@ impl Perform for EditSite {
 
     let res = SiteResponse { site: site_view };
 
-    if let Some(ws) = websocket_info {
-      ws.chatserver.do_send(SendAllMessage {
-        op: UserOperation::EditSite,
-        response: res.clone(),
-        my_id: ws.id,
-      });
-    }
+    context.chat_server().do_send(SendAllMessage {
+      op: UserOperation::EditSite,
+      response: res.clone(),
+      websocket_id,
+    });
 
     Ok(res)
   }
@@ -348,7 +346,7 @@ impl Perform for GetSite {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    websocket_info: Option<WebsocketInfo>,
+    websocket_id: Option<ConnectionId>,
   ) -> Result<GetSiteResponse, LemmyError> {
     let data: &GetSite = &self;
 
@@ -367,7 +365,7 @@ impl Perform for GetSite {
         captcha_uuid: None,
         captcha_answer: None,
       };
-      let login_response = register.perform(context, websocket_info.clone()).await?;
+      let login_response = register.perform(context, websocket_id).await?;
       info!("Admin {} created", setup.admin_username);
 
       let create_site = CreateSite {
@@ -380,7 +378,7 @@ impl Perform for GetSite {
         enable_nsfw: true,
         auth: login_response.jwt,
       };
-      create_site.perform(context, websocket_info.clone()).await?;
+      create_site.perform(context, websocket_id).await?;
       info!("Site {} created", setup.site_name);
       Some(blocking(context.pool(), move |conn| SiteView::read(conn)).await??)
     } else {
@@ -402,11 +400,11 @@ impl Perform for GetSite {
 
     let banned = blocking(context.pool(), move |conn| UserView::banned(conn)).await??;
 
-    let online = if let Some(ws) = websocket_info {
-      ws.chatserver.send(GetUsersOnline).await.unwrap_or(1)
-    } else {
-      0
-    };
+    let online = context
+      .chat_server()
+      .send(GetUsersOnline)
+      .await
+      .unwrap_or(1);
 
     let my_user = get_user_from_jwt_opt(&data.auth, context.pool())
       .await?
@@ -436,7 +434,7 @@ impl Perform for Search {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    _websocket_info: Option<WebsocketInfo>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<SearchResponse, LemmyError> {
     let data: &Search = &self;
 
@@ -600,7 +598,7 @@ impl Perform for TransferSite {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    _websocket_info: Option<WebsocketInfo>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<GetSiteResponse, LemmyError> {
     let data: &TransferSite = &self;
     let mut user = get_user_from_jwt(&data.auth, context.pool()).await?;
@@ -663,7 +661,7 @@ impl Perform for GetSiteConfig {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    _websocket_info: Option<WebsocketInfo>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<GetSiteConfigResponse, LemmyError> {
     let data: &GetSiteConfig = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;
@@ -684,7 +682,7 @@ impl Perform for SaveSiteConfig {
   async fn perform(
     &self,
     context: &Data<LemmyContext>,
-    _websocket_info: Option<WebsocketInfo>,
+    _websocket_id: Option<ConnectionId>,
   ) -> Result<GetSiteConfigResponse, LemmyError> {
     let data: &SaveSiteConfig = &self;
     let user = get_user_from_jwt(&data.auth, context.pool()).await?;

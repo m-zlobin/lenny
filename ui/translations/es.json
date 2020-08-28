@@ -139,7 +139,7 @@
     "no_email_setup": "Este servidor no ha activado correctamente el correo.",
     "email": "Correo electrónico",
     "matrix_user_id": "Usuario Matricial",
-    "private_message_disclaimer": "Aviso: Los mensajes privados en Lemmy no son seguros. Por favor cree una cuenta en <1>Riot.im</1> para mensajeria segura.",
+    "private_message_disclaimer": "Aviso: Los mensajes privados en Lemmy no son seguros. Por favor cree una cuenta en <1>Element.io</1> para mensajería segura.",
     "send_notifications_to_email": "Enviar notificaciones al correo",
     "optional": "Opcional",
     "expires": "Expira",
@@ -239,5 +239,18 @@
     "invalid_username": "Nombre de usuario inválido.",
     "invalid_community_name": "Nombre no válido.",
     "click_to_delete_picture": "Pulse para eliminar la imagen.",
-    "picture_deleted": "Imagen eliminada."
+    "picture_deleted": "Imagen eliminada.",
+    "italic": "cursiva",
+    "subscript": "subíndice",
+    "superscript": "superíndice",
+    "header": "título",
+    "quote": "cita",
+    "spoiler": "spoiler",
+    "list": "lista",
+    "no_password_reset": "No podrás restablecer tu contraseña si no tienes correo.",
+    "what_is": "Cuanto es",
+    "bold": "negrita",
+    "strikethrough": "tachado",
+    "must_login": "Debes <1>iniciar sesión o registrarse</1> para hacer comentarios.",
+    "cake_day_info": "¡Hoy es el cumpleaños de {{ creator_name }}!"
 }

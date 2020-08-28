@@ -16,7 +16,12 @@ To maintain stability, this fork has a little no changes, but:
 
 # The Lemmy Problem
 
+<<<<<<< HEAD
 `static ref SLUR_REGEX: Regex = RegexBuilder::new(r"(fag(g|got|tard)?|maricos?|cock\s?sucker(s|ing)?|\bn(i|1)g(\b|g?(a|er)?(s|z)?)\b|dindu(s?)|mudslime?s?|kikes?|mongoloids?|towel\s*heads?|\bspi(c|k)s?\b|\bchinks?|niglets?|beaners?|\bnips?\b|\bcoons?\b|jungle\s*bunn(y|ies?)|jigg?aboo?s?|\bpakis?\b|rag\s*heads?|gooks?|cunts?|bitch(es|ing|y)?|puss(y|ies?)|twats?|feminazis?|whor(es?|ing)|\bslut(s|t?y)?|\btr(a|@)nn?(y|ies?)|ladyboy(s?)|\b(b|re|r)tard(ed)?s?)").case_insensitive(true).build().unwrap();`
+=======
+- [lemmy-js-client](https://github.com/LemmyNet/lemmy-js-client)
+- [Kotlin API ( under development )](https://github.com/eiknat/lemmy-client)
+>>>>>>> upstream/main
 
 https://github.com/LemmyNet/lemmy/commit/1c0cc78f3f6d191aa384d8702016564625d51269
 
