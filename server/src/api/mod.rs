@@ -1,16 +1,13 @@
-use crate::{api::claims::Claims, blocking, ConnectionId, DbPool, LemmyContext, LemmyError};
+use crate::{api::claims::Claims, blocking, DbPool, LemmyContext};
 use actix_web::web::Data;
 use lemmy_db::{
-  community::*,
-  community_view::*,
-  moderator::*,
+  community::Community,
+  community_view::CommunityUserBanView,
   post::Post,
-  site::*,
-  user::*,
-  user_view::*,
+  user::User_,
   Crud,
 };
-use thiserror::Error;
+use lemmy_utils::{APIError, ConnectionId, LemmyError};
 
 pub mod claims;
 pub mod comment;
@@ -18,20 +15,6 @@ pub mod community;
 pub mod post;
 pub mod site;
 pub mod user;
-
-#[derive(Debug, Error)]
-#[error("{{\"error\":\"{message}\"}}")]
-pub struct APIError {
-  pub message: String,
-}
-
-impl APIError {
-  pub fn err(msg: &str) -> Self {
-    APIError {
-      message: msg.to_string(),
-    }
-  }
-}
 
 #[async_trait::async_trait(?Send)]
 pub trait Perform {

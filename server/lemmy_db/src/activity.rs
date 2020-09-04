@@ -1,14 +1,14 @@
 use crate::{schema::activity, Crud};
 use diesel::{dsl::*, result::Error, *};
 use log::debug;
-use serde::{Deserialize, Serialize};
+use serde::{Serialize};
 use serde_json::Value;
 use std::{
   fmt::Debug,
   io::{Error as IoError, ErrorKind},
 };
 
-#[derive(Queryable, Identifiable, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Queryable, Identifiable, PartialEq, Debug)]
 #[table_name = "activity"]
 pub struct Activity {
   pub id: i32,
@@ -19,7 +19,7 @@ pub struct Activity {
   pub updated: Option<chrono::NaiveDateTime>,
 }
 
-#[derive(Insertable, AsChangeset, Clone, Serialize, Deserialize)]
+#[derive(Insertable, AsChangeset)]
 #[table_name = "activity"]
 pub struct ActivityForm {
   pub user_id: i32,
@@ -113,7 +113,7 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
-      actor_id: "changeme_862362".into(),
+      actor_id: None,
       bio: None,
       local: true,
       private_key: None,

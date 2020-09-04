@@ -1,11 +1,14 @@
 use crate::{
-  get_ip,
-  websocket::server::{ChatServer, *},
+  websocket::{
+    chat_server::ChatServer,
+    messages::{Connect, Disconnect, StandardMessage, WSMessage},
+  },
   LemmyContext,
 };
 use actix::prelude::*;
 use actix_web::*;
 use actix_web_actors::ws;
+use lemmy_utils::get_ip;
 use log::{debug, error, info};
 use std::time::{Duration, Instant};
 

@@ -1,9 +1,8 @@
 use super::comment::Comment;
 use crate::{schema::user_mention, Crud};
 use diesel::{dsl::*, result::Error, *};
-use serde::{Deserialize, Serialize};
 
-#[derive(Queryable, Associations, Identifiable, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Queryable, Associations, Identifiable, PartialEq, Debug)]
 #[belongs_to(Comment)]
 #[table_name = "user_mention"]
 pub struct UserMention {
@@ -14,7 +13,7 @@ pub struct UserMention {
   pub published: chrono::NaiveDateTime,
 }
 
-#[derive(Insertable, AsChangeset, Clone)]
+#[derive(Insertable, AsChangeset)]
 #[table_name = "user_mention"]
 pub struct UserMentionForm {
   pub recipient_id: i32,
@@ -106,7 +105,7 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
-      actor_id: "changeme_628763".into(),
+      actor_id: None,
       bio: None,
       local: true,
       private_key: None,
@@ -134,7 +133,7 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
-      actor_id: "changeme_927389278".into(),
+      actor_id: None,
       bio: None,
       local: true,
       private_key: None,
@@ -154,7 +153,7 @@ mod tests {
       deleted: None,
       updated: None,
       nsfw: false,
-      actor_id: "changeme_876238".into(),
+      actor_id: None,
       local: true,
       private_key: None,
       public_key: None,
@@ -182,7 +181,7 @@ mod tests {
       embed_description: None,
       embed_html: None,
       thumbnail_url: None,
-      ap_id: "http://fake.com".into(),
+      ap_id: None,
       local: true,
       published: None,
     };
@@ -199,7 +198,7 @@ mod tests {
       parent_id: None,
       published: None,
       updated: None,
-      ap_id: "http://fake.com".into(),
+      ap_id: None,
       local: true,
     };
 

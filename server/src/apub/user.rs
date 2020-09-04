@@ -1,6 +1,7 @@
 use crate::{
   apub::{
-    activities::{generate_activity_id, send_activity},
+    activities::generate_activity_id,
+    activity_queue::send_activity,
     check_actor_domain,
     create_apub_response,
     fetcher::get_or_fetch_and_upsert_actor,
@@ -13,7 +14,6 @@ use crate::{
   blocking,
   DbPool,
   LemmyContext,
-  LemmyError,
 };
 use activitystreams::{
   activity::{
@@ -32,7 +32,7 @@ use lemmy_db::{
   naive_now,
   user::{UserForm, User_},
 };
-use lemmy_utils::{convert_datetime, location_info};
+use lemmy_utils::{convert_datetime, location_info, LemmyError};
 use serde::Deserialize;
 use url::Url;
 
@@ -126,7 +126,7 @@ impl ActorType for User_ {
 
     insert_activity(self.id, follow.clone(), true, context.pool()).await?;
 
-    send_activity(context.client(), &follow.into_any_base()?, self, vec![to]).await?;
+    send_activity(context.activity_queue(), follow, self, vec![to])?;
     Ok(())
   }
 
@@ -151,7 +151,7 @@ impl ActorType for User_ {
 
     insert_activity(self.id, undo.clone(), true, context.pool()).await?;
 
-    send_activity(context.client(), &undo.into_any_base()?, self, vec![to]).await?;
+    send_activity(context.activity_queue(), undo, self, vec![to])?;
     Ok(())
   }
 
@@ -264,7 +264,7 @@ impl FromApub for UserForm {
       show_avatars: false,
       send_notifications_to_email: false,
       matrix_user_id: None,
-      actor_id: check_actor_domain(person, expected_domain)?,
+      actor_id: Some(check_actor_domain(person, expected_domain)?),
       bio,
       local: false,
       private_key: None,

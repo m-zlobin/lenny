@@ -1,28 +1,20 @@
 use crate::{
-  api::{
-    claims::Claims,
-    get_user_from_jwt,
-    get_user_from_jwt_opt,
-    is_admin,
-    APIError,
-    Perform,
-  },
+  api::{claims::Claims, get_user_from_jwt, get_user_from_jwt_opt, is_admin, Perform},
   apub::ApubObjectType,
   blocking,
   captcha_espeak_wav_base64,
   websocket::{
-    server::{CaptchaItem, CheckCaptcha, JoinUserRoom, SendAllMessage, SendUserRoomMessage},
+    messages::{CaptchaItem, CheckCaptcha, JoinUserRoom, SendAllMessage, SendUserRoomMessage},
     UserOperation,
   },
-  ConnectionId,
   LemmyContext,
-  LemmyError,
 };
 use actix_web::web::Data;
 use anyhow::Context;
 use bcrypt::verify;
 use captcha::{gen, Difficulty};
 use chrono::Duration;
+use lemmy_api_structs::user::*;
 use lemmy_db::{
   comment::*,
   comment_view::*,
@@ -58,242 +50,14 @@ use lemmy_utils::{
   naive_from_unix,
   send_email,
   settings::Settings,
+  APIError,
+  ConnectionId,
   EndpointType,
+  LemmyError,
   fake_remove_slurs,
 };
 use log::error;
-use serde::{Deserialize, Serialize};
 use std::str::FromStr;
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct Login {
-  username_or_email: String,
-  password: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct Register {
-  pub username: String,
-  pub email: Option<String>,
-  pub password: String,
-  pub password_verify: String,
-  pub admin: bool,
-  pub show_nsfw: bool,
-  pub captcha_uuid: Option<String>,
-  pub captcha_answer: Option<String>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct GetCaptcha {}
-
-#[derive(Serialize, Deserialize)]
-pub struct GetCaptchaResponse {
-  ok: Option<CaptchaResponse>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct CaptchaResponse {
-  png: String,         // A Base64 encoded png
-  wav: Option<String>, // A Base64 encoded wav audio
-  uuid: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct SaveUserSettings {
-  show_nsfw: bool,
-  theme: String,
-  default_sort_type: i16,
-  default_listing_type: i16,
-  lang: String,
-  avatar: Option<String>,
-  banner: Option<String>,
-  preferred_username: Option<String>,
-  email: Option<String>,
-  bio: Option<String>,
-  matrix_user_id: Option<String>,
-  new_password: Option<String>,
-  new_password_verify: Option<String>,
-  old_password: Option<String>,
-  show_avatars: bool,
-  send_notifications_to_email: bool,
-  auth: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct LoginResponse {
-  pub jwt: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct GetUserDetails {
-  user_id: Option<i32>,
-  username: Option<String>,
-  sort: String,
-  page: Option<i64>,
-  limit: Option<i64>,
-  community_id: Option<i32>,
-  saved_only: bool,
-  auth: Option<String>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct GetUserDetailsResponse {
-  user: UserView,
-  follows: Vec<CommunityFollowerView>,
-  moderates: Vec<CommunityModeratorView>,
-  comments: Vec<CommentView>,
-  posts: Vec<PostView>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct GetRepliesResponse {
-  replies: Vec<ReplyView>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct GetUserMentionsResponse {
-  mentions: Vec<UserMentionView>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct MarkAllAsRead {
-  auth: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct AddAdmin {
-  user_id: i32,
-  added: bool,
-  auth: String,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct AddAdminResponse {
-  admins: Vec<UserView>,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct BanUser {
-  user_id: i32,
-  ban: bool,
-  remove_data: Option<bool>,
-  reason: Option<String>,
-  expires: Option<i64>,
-  auth: String,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct BanUserResponse {
-  user: UserView,
-  banned: bool,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct GetReplies {
-  sort: String,
-  page: Option<i64>,
-  limit: Option<i64>,
-  unread_only: bool,
-  auth: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct GetUserMentions {
-  sort: String,
-  page: Option<i64>,
-  limit: Option<i64>,
-  unread_only: bool,
-  auth: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct MarkUserMentionAsRead {
-  user_mention_id: i32,
-  read: bool,
-  auth: String,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct UserMentionResponse {
-  mention: UserMentionView,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct DeleteAccount {
-  password: String,
-  auth: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct PasswordReset {
-  email: String,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct PasswordResetResponse {}
-
-#[derive(Serialize, Deserialize)]
-pub struct PasswordChange {
-  token: String,
-  password: String,
-  password_verify: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct CreatePrivateMessage {
-  content: String,
-  pub recipient_id: i32,
-  auth: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct EditPrivateMessage {
-  edit_id: i32,
-  content: String,
-  auth: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct DeletePrivateMessage {
-  edit_id: i32,
-  deleted: bool,
-  auth: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct MarkPrivateMessageAsRead {
-  edit_id: i32,
-  read: bool,
-  auth: String,
-}
-
-#[derive(Serialize, Deserialize)]
-pub struct GetPrivateMessages {
-  unread_only: bool,
-  page: Option<i64>,
-  limit: Option<i64>,
-  auth: String,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct PrivateMessagesResponse {
-  messages: Vec<PrivateMessageView>,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct PrivateMessageResponse {
-  pub message: PrivateMessageView,
-}
-
-#[derive(Serialize, Deserialize, Debug)]
-pub struct UserJoin {
-  auth: String,
-}
-
-#[derive(Serialize, Deserialize, Clone)]
-pub struct UserJoinResponse {
-  pub user_id: i32,
-}
 
 #[async_trait::async_trait(?Send)]
 impl Perform for Login {
@@ -407,7 +171,7 @@ impl Perform for Register {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
-      actor_id: make_apub_endpoint(EndpointType::User, &data.username).to_string(),
+      actor_id: Some(make_apub_endpoint(EndpointType::User, &data.username).to_string()),
       bio: None,
       local: true,
       private_key: Some(user_keypair.private_key),
@@ -438,37 +202,38 @@ impl Perform for Register {
     let main_community_keypair = generate_actor_keypair()?;
 
     // Create the main community if it doesn't exist
-    let main_community = match blocking(context.pool(), move |conn| Community::read(conn, 2))
-      .await?
-    {
-      Ok(c) => c,
-      Err(_e) => {
-        let default_community_name = "main";
-        let community_form = CommunityForm {
-          name: default_community_name.to_string(),
-          title: "The Default Community".to_string(),
-          description: Some("The Default Community".to_string()),
-          category_id: 1,
-          nsfw: false,
-          creator_id: inserted_user.id,
-          removed: None,
-          deleted: None,
-          updated: None,
-          actor_id: make_apub_endpoint(EndpointType::Community, default_community_name).to_string(),
-          local: true,
-          private_key: Some(main_community_keypair.private_key),
-          public_key: Some(main_community_keypair.public_key),
-          last_refreshed_at: None,
-          published: None,
-          icon: None,
-          banner: None,
-        };
-        blocking(context.pool(), move |conn| {
-          Community::create(conn, &community_form)
-        })
-        .await??
-      }
-    };
+    let main_community =
+      match blocking(context.pool(), move |conn| Community::read(conn, 2)).await? {
+        Ok(c) => c,
+        Err(_e) => {
+          let default_community_name = "main";
+          let community_form = CommunityForm {
+            name: default_community_name.to_string(),
+            title: "The Default Community".to_string(),
+            description: Some("The Default Community".to_string()),
+            category_id: 1,
+            nsfw: false,
+            creator_id: inserted_user.id,
+            removed: None,
+            deleted: None,
+            updated: None,
+            actor_id: Some(
+              make_apub_endpoint(EndpointType::Community, default_community_name).to_string(),
+            ),
+            local: true,
+            private_key: Some(main_community_keypair.private_key),
+            public_key: Some(main_community_keypair.public_key),
+            last_refreshed_at: None,
+            published: None,
+            icon: None,
+            banner: None,
+          };
+          blocking(context.pool(), move |conn| {
+            Community::create(conn, &community_form)
+          })
+          .await??
+        }
+      };
 
     // Sign them up for main community no matter what
     let community_follower_form = CommunityFollowerForm {
@@ -640,7 +405,7 @@ impl Perform for SaveUserSettings {
       lang: data.lang.to_owned(),
       show_avatars: data.show_avatars,
       send_notifications_to_email: data.send_notifications_to_email,
-      actor_id: read_user.actor_id,
+      actor_id: Some(read_user.actor_id),
       bio,
       local: read_user.local,
       private_key: read_user.private_key,
@@ -1216,7 +981,7 @@ impl Perform for CreatePrivateMessage {
       deleted: None,
       read: None,
       updated: None,
-      ap_id: "http://fake.com".into(),
+      ap_id: None,
       local: true,
       published: None,
     };

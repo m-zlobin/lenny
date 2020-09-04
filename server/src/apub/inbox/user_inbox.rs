@@ -1,5 +1,4 @@
 use crate::{
-  api::user::PrivateMessageResponse,
   apub::{
     check_is_apub_id_valid,
     extensions::signatures::verify,
@@ -8,9 +7,8 @@ use crate::{
     FromApub,
   },
   blocking,
-  websocket::{server::SendUserRoomMessage, UserOperation},
+  websocket::{messages::SendUserRoomMessage, UserOperation},
   LemmyContext,
-  LemmyError,
 };
 use activitystreams::{
   activity::{Accept, ActorAndObject, Create, Delete, Undo, Update},
@@ -20,6 +18,7 @@ use activitystreams::{
 };
 use actix_web::{web, HttpRequest, HttpResponse};
 use anyhow::Context;
+use lemmy_api_structs::user::PrivateMessageResponse;
 use lemmy_db::{
   community::{CommunityFollower, CommunityFollowerForm},
   naive_now,
@@ -29,7 +28,7 @@ use lemmy_db::{
   Crud,
   Followable,
 };
-use lemmy_utils::location_info;
+use lemmy_utils::{location_info, LemmyError};
 use log::debug;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -175,7 +174,11 @@ async fn receive_update_private_message(
   let domain = Some(update.id_unchecked().context(location_info!())?.to_owned());
   let private_message_form = PrivateMessageForm::from_apub(&note, context, domain).await?;
 
-  let private_message_ap_id = private_message_form.ap_id.clone();
+  let private_message_ap_id = private_message_form
+    .ap_id
+    .as_ref()
+    .context(location_info!())?
+    .clone();
   let private_message = blocking(&context.pool(), move |conn| {
     PrivateMessage::read_from_apub_id(conn, &private_message_ap_id)
   })
@@ -224,7 +227,7 @@ async fn receive_delete_private_message(
   let domain = Some(delete.id_unchecked().context(location_info!())?.to_owned());
   let private_message_form = PrivateMessageForm::from_apub(&note, context, domain).await?;
 
-  let private_message_ap_id = private_message_form.ap_id;
+  let private_message_ap_id = private_message_form.ap_id.context(location_info!())?;
   let private_message = blocking(&context.pool(), move |conn| {
     PrivateMessage::read_from_apub_id(conn, &private_message_ap_id)
   })
@@ -236,7 +239,7 @@ async fn receive_delete_private_message(
     creator_id: private_message.creator_id,
     deleted: Some(true),
     read: None,
-    ap_id: private_message.ap_id,
+    ap_id: Some(private_message.ap_id),
     local: private_message.local,
     published: None,
     updated: Some(naive_now()),
@@ -287,7 +290,11 @@ async fn receive_undo_delete_private_message(
   let domain = Some(undo.id_unchecked().context(location_info!())?.to_owned());
   let private_message = PrivateMessageForm::from_apub(&note, context, domain).await?;
 
-  let private_message_ap_id = private_message.ap_id.clone();
+  let private_message_ap_id = private_message
+    .ap_id
+    .as_ref()
+    .context(location_info!())?
+    .clone();
   let private_message_id = blocking(&context.pool(), move |conn| {
     PrivateMessage::read_from_apub_id(conn, &private_message_ap_id).map(|pm| pm.id)
   })
