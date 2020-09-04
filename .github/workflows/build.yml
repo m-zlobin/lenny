@@ -35,17 +35,17 @@ jobs:
       - name: "Install Rust toolchain"
         uses: actions-rs/toolchain@v1
         with:
-          toolchain: stable
+          toolchain: nightly
           override: true
           components: "rustfmt, clippy"
-
-      - name: "Build backend code"
-        run: |
-          cargo build --release
 
       - name: "Lint backend code"
         run: |
           cargo clippy -- -D clippy::style -D clippy::correctness -D clippy::complexity -D clippy::perf
+
+      - name: "Build backend code"
+        run: |
+          cargo build
       
       - name: "Run backend migrations"
         run: |
