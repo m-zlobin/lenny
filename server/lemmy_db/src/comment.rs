@@ -1,5 +1,12 @@
-use super::{post::Post, *};
-use crate::schema::{comment, comment_like, comment_saved};
+use super::post::Post;
+use crate::{
+  naive_now,
+  schema::{comment, comment_like, comment_saved},
+  Crud,
+  Likeable,
+  Saveable,
+};
+use diesel::{dsl::*, result::Error, *};
 use url::{ParseError, Url};
 
 // WITH RECURSIVE MyTree AS (
@@ -9,7 +16,7 @@ use url::{ParseError, Url};
 // )
 // SELECT * FROM MyTree;
 
-#[derive(Clone, Queryable, Associations, Identifiable, PartialEq, Debug, Serialize, Deserialize)]
+#[derive(Clone, Queryable, Associations, Identifiable, PartialEq, Debug)]
 #[belongs_to(Post)]
 #[table_name = "comment"]
 pub struct Comment {
@@ -39,13 +46,13 @@ pub struct CommentForm {
   pub published: Option<chrono::NaiveDateTime>,
   pub updated: Option<chrono::NaiveDateTime>,
   pub deleted: Option<bool>,
-  pub ap_id: String,
+  pub ap_id: Option<String>,
   pub local: bool,
 }
 
 impl CommentForm {
   pub fn get_ap_id(&self) -> Result<Url, ParseError> {
-    Url::parse(&self.ap_id)
+    Url::parse(&self.ap_id.as_ref().unwrap_or(&"not_a_url".to_string()))
   }
 }
 
@@ -163,12 +170,13 @@ impl Comment {
   }
 
   pub fn upsert(conn: &PgConnection, comment_form: &CommentForm) -> Result<Self, Error> {
-    let existing = Self::read_from_apub_id(conn, &comment_form.ap_id);
-    match existing {
-      Err(NotFound {}) => Ok(Self::create(conn, &comment_form)?),
-      Ok(p) => Ok(Self::update(conn, p.id, &comment_form)?),
-      Err(e) => Err(e),
-    }
+    use crate::schema::comment::dsl::*;
+    insert_into(comment)
+      .values(comment_form)
+      .on_conflict(ap_id)
+      .do_update()
+      .set(comment_form)
+      .get_result::<Self>(conn)
   }
 }
 
@@ -221,7 +229,7 @@ pub struct CommentSaved {
   pub published: chrono::NaiveDateTime,
 }
 
-#[derive(Insertable, AsChangeset, Clone)]
+#[derive(Insertable, AsChangeset)]
 #[table_name = "comment_saved"]
 pub struct CommentSavedForm {
   pub comment_id: i32,
@@ -248,7 +256,16 @@ impl Saveable<CommentSavedForm> for CommentSaved {
 
 #[cfg(test)]
 mod tests {
-  use crate::{comment::*, community::*, post::*, tests::establish_unpooled_connection, user::*};
+  use crate::{
+    comment::*,
+    community::*,
+    post::*,
+    tests::establish_unpooled_connection,
+    user::*,
+    Crud,
+    ListingType,
+    SortType,
+  };
 
   #[test]
   fn test_crud() {
@@ -272,7 +289,7 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
-      actor_id: "changeme_283687".into(),
+      actor_id: None,
       bio: None,
       local: true,
       private_key: None,
@@ -292,7 +309,7 @@ mod tests {
       deleted: None,
       updated: None,
       nsfw: false,
-      actor_id: "changeme_928738972".into(),
+      actor_id: None,
       local: true,
       private_key: None,
       public_key: None,
@@ -320,7 +337,7 @@ mod tests {
       embed_description: None,
       embed_html: None,
       thumbnail_url: None,
-      ap_id: "http://fake.com".into(),
+      ap_id: None,
       local: true,
       published: None,
     };
@@ -337,7 +354,7 @@ mod tests {
       parent_id: None,
       published: None,
       updated: None,
-      ap_id: "http://fake.com".into(),
+      ap_id: None,
       local: true,
     };
 
@@ -354,7 +371,7 @@ mod tests {
       parent_id: None,
       published: inserted_comment.published,
       updated: None,
-      ap_id: "http://fake.com".into(),
+      ap_id: inserted_comment.ap_id.to_owned(),
       local: true,
     };
 
@@ -368,7 +385,7 @@ mod tests {
       read: None,
       published: None,
       updated: None,
-      ap_id: "http://fake.com".into(),
+      ap_id: None,
       local: true,
     };
 

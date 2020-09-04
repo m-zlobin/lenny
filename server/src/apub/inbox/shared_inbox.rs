@@ -21,7 +21,6 @@ use crate::{
     insert_activity,
   },
   LemmyContext,
-  LemmyError,
 };
 use activitystreams::{
   activity::{ActorAndObject, ActorAndObjectRef},
@@ -32,7 +31,7 @@ use activitystreams::{
 use actix_web::{web, HttpRequest, HttpResponse};
 use anyhow::Context;
 use lemmy_db::user::User_;
-use lemmy_utils::location_info;
+use lemmy_utils::{location_info, LemmyError};
 use log::debug;
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
@@ -65,6 +64,8 @@ pub async fn shared_inbox(
 
   let json = serde_json::to_string(&activity)?;
   debug!("Shared inbox received activity: {}", json);
+
+  // TODO: if we already received an activity with identical ID, then ignore this (same in other inboxes)
 
   let sender = &activity
     .actor()?

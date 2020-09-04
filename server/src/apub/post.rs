@@ -17,7 +17,6 @@ use crate::{
   blocking,
   DbPool,
   LemmyContext,
-  LemmyError,
 };
 use activitystreams::{
   activity::{
@@ -43,7 +42,7 @@ use lemmy_db::{
   user::User_,
   Crud,
 };
-use lemmy_utils::{convert_datetime, location_info, fake_remove_slurs};
+use lemmy_utils::{convert_datetime, location_info, fake_remove_slurs, LemmyError};
 use serde::Deserialize;
 use url::Url;
 
@@ -287,7 +286,7 @@ impl FromApub for PostForm {
       embed_description: embed.description,
       embed_html: embed.html,
       thumbnail_url,
-      ap_id: check_actor_domain(page, expected_domain)?,
+      ap_id: Some(check_actor_domain(page, expected_domain)?),
       local: false,
     })
   }
@@ -316,7 +315,7 @@ impl ApubObjectType for Post {
       creator,
       &community,
       vec![community.get_shared_inbox_url()?],
-      create.into_any_base()?,
+      create,
       context,
     )
     .await?;
@@ -344,7 +343,7 @@ impl ApubObjectType for Post {
       creator,
       &community,
       vec![community.get_shared_inbox_url()?],
-      update.into_any_base()?,
+      update,
       context,
     )
     .await?;
@@ -371,7 +370,7 @@ impl ApubObjectType for Post {
       creator,
       &community,
       vec![community.get_shared_inbox_url()?],
-      delete.into_any_base()?,
+      delete,
       context,
     )
     .await?;
@@ -410,7 +409,7 @@ impl ApubObjectType for Post {
       creator,
       &community,
       vec![community.get_shared_inbox_url()?],
-      undo.into_any_base()?,
+      undo,
       context,
     )
     .await?;
@@ -437,7 +436,7 @@ impl ApubObjectType for Post {
       mod_,
       &community,
       vec![community.get_shared_inbox_url()?],
-      remove.into_any_base()?,
+      remove,
       context,
     )
     .await?;
@@ -472,7 +471,7 @@ impl ApubObjectType for Post {
       mod_,
       &community,
       vec![community.get_shared_inbox_url()?],
-      undo.into_any_base()?,
+      undo,
       context,
     )
     .await?;
@@ -502,7 +501,7 @@ impl ApubLikeableType for Post {
       &creator,
       &community,
       vec![community.get_shared_inbox_url()?],
-      like.into_any_base()?,
+      like,
       context,
     )
     .await?;
@@ -529,7 +528,7 @@ impl ApubLikeableType for Post {
       &creator,
       &community,
       vec![community.get_shared_inbox_url()?],
-      dislike.into_any_base()?,
+      dislike,
       context,
     )
     .await?;
@@ -568,7 +567,7 @@ impl ApubLikeableType for Post {
       &creator,
       &community,
       vec![community.get_shared_inbox_url()?],
-      undo.into_any_base()?,
+      undo,
       context,
     )
     .await?;

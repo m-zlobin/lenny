@@ -1,12 +1,9 @@
 #[macro_use]
 extern crate diesel_migrations;
-#[macro_use]
-pub extern crate lazy_static;
 
 use actix::prelude::*;
 use actix_web::{
   body::Body,
-  client::Client,
   dev::{Service, ServiceRequest, ServiceResponse},
   http::{
     header::{CACHE_CONTROL, CONTENT_TYPE},
@@ -18,17 +15,19 @@ use diesel::{
   r2d2::{ConnectionManager, Pool},
   PgConnection,
 };
+use lazy_static::lazy_static;
 use lemmy_db::get_database_url_from_env;
+use lemmy_rate_limit::{rate_limiter::RateLimiter, RateLimit};
 use lemmy_server::{
+  apub::activity_queue::create_activity_queue,
   blocking,
   code_migrations::run_advanced_migrations,
-  rate_limit::{rate_limiter::RateLimiter, RateLimit},
   routes::*,
-  websocket::server::*,
+  websocket::chat_server::ChatServer,
   LemmyContext,
-  LemmyError,
 };
-use lemmy_utils::{settings::Settings, CACHE_CONTROL_REGEX};
+use lemmy_utils::{settings::Settings, LemmyError, CACHE_CONTROL_REGEX};
+use reqwest::Client;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -74,12 +73,23 @@ async fn main() -> Result<(), LemmyError> {
     settings.bind, settings.port
   );
 
-  let chat_server =
-    ChatServer::startup(pool.clone(), rate_limiter.clone(), Client::default()).start();
+  let activity_queue = create_activity_queue();
+  let chat_server = ChatServer::startup(
+    pool.clone(),
+    rate_limiter.clone(),
+    Client::default(),
+    activity_queue.clone(),
+  )
+  .start();
 
   // Create Http server with websocket support
   HttpServer::new(move || {
-    let context = LemmyContext::create(pool.clone(), chat_server.to_owned(), Client::default());
+    let context = LemmyContext::create(
+      pool.clone(),
+      chat_server.to_owned(),
+      Client::default(),
+      activity_queue.to_owned(),
+    );
     let settings = Settings::get();
     let rate_limiter = rate_limiter.clone();
     App::new()

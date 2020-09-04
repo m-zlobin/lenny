@@ -1,7 +1,7 @@
 use super::post_view::post_fast_view::BoxedQuery;
 use crate::{fuzzy_search, limit_and_offset, ListingType, MaybeOptional, SortType};
 use diesel::{dsl::*, pg::Pg, result::Error, *};
-use serde::{Deserialize, Serialize};
+use serde::{Serialize};
 
 // The faked schema since diesel doesn't do views
 table! {
@@ -107,7 +107,7 @@ table! {
 }
 
 #[derive(
-  Queryable, Identifiable, PartialEq, Debug, Serialize, Deserialize, QueryableByName, Clone,
+  Queryable, Identifiable, PartialEq, Debug, Serialize, QueryableByName, Clone,
 )]
 #[table_name = "post_fast_view"]
 pub struct PostView {
@@ -267,9 +267,11 @@ impl<'a> PostQueryBuilder<'a> {
 
     let mut query = self.query;
 
-    if let ListingType::Subscribed = self.listing_type {
-      query = query.filter(subscribed.eq(true));
-    }
+    query = match self.listing_type {
+      ListingType::Subscribed => query.filter(subscribed.eq(true)),
+      ListingType::Local => query.filter(community_local.eq(true)),
+      _ => query,
+    };
 
     if let Some(for_community_id) = self.for_community_id {
       query = query.filter(community_id.eq(for_community_id));
@@ -423,7 +425,7 @@ mod tests {
       lang: "browser".into(),
       show_avatars: true,
       send_notifications_to_email: false,
-      actor_id: "changeme_8282738268".into(),
+      actor_id: None,
       bio: None,
       local: true,
       private_key: None,
@@ -443,7 +445,7 @@ mod tests {
       deleted: None,
       updated: None,
       nsfw: false,
-      actor_id: "changeme_2763".into(),
+      actor_id: None,
       local: true,
       private_key: None,
       public_key: None,
@@ -471,7 +473,7 @@ mod tests {
       embed_description: None,
       embed_html: None,
       thumbnail_url: None,
-      ap_id: "http://fake.com".into(),
+      ap_id: None,
       local: true,
       published: None,
     };
@@ -555,7 +557,7 @@ mod tests {
       embed_description: None,
       embed_html: None,
       thumbnail_url: None,
-      ap_id: "http://fake.com".to_string(),
+      ap_id: inserted_post.ap_id.to_owned(),
       local: true,
       creator_actor_id: inserted_user.actor_id.to_owned(),
       creator_local: true,
@@ -604,7 +606,7 @@ mod tests {
       embed_description: None,
       embed_html: None,
       thumbnail_url: None,
-      ap_id: "http://fake.com".to_string(),
+      ap_id: inserted_post.ap_id.to_owned(),
       local: true,
       creator_actor_id: inserted_user.actor_id.to_owned(),
       creator_local: true,
