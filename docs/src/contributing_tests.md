@@ -3,7 +3,7 @@
 #### Rust
 
 After installing [local development dependencies](contributing_local_development.md), run the
-following commands in the `server` subfolder:
+following commands:
 
 ```bash
 psql -U lemmy -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
@@ -12,5 +12,9 @@ psql -U lemmy -c "DROP SCHEMA public CASCADE; CREATE SCHEMA public;"
 
 ### Federation
 
-Install the [Docker development dependencies](contributing_docker_development.md), and execute
-`docker/federation-test/run-tests.sh`
+Install the [Docker development dependencies](contributing_docker_development.md), and execute:
+
+```
+cd docker/federation
+./run-tests.bash
+```
