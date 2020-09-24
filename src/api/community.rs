@@ -35,7 +35,7 @@ use lemmy_structs::{
 use lemmy_utils::{
   apub::{generate_actor_keypair, make_apub_endpoint, EndpointType},
   location_info,
-  utils::{check_slurs, check_slurs_opt, is_valid_community_name, naive_from_unix},
+  utils::{is_valid_community_name, naive_from_unix},
   APIError,
   ConnectionId,
   LemmyError,

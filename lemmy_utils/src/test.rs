@@ -3,10 +3,8 @@ use crate::utils::{
   is_valid_post_title,
   is_valid_preferred_username,
   is_valid_username,
-  remove_slurs,
+  fake_remove_slurs,
   scrape_text_for_mentions,
-  slur_check,
-  slurs_vec_to_str,
 };
 
 #[test]
@@ -48,34 +46,6 @@ fn test_valid_post_title() {
   assert!(is_valid_post_title("Post Title"));
   assert!(is_valid_post_title("   POST TITLE 😃😃😃😃😃"));
   assert!(!is_valid_post_title("\n \n \n \n    		")); // tabs/spaces/newlines
-}
-
-#[test]
-fn test_slur_filter() {
-  let test =
-      "coons test dindu ladyboy tranny retardeds. Capitalized Niggerz. This is a bunch of other safe text.";
-  let slur_free = "No slurs here";
-  assert_eq!(
-      remove_slurs(&test),
-      "*removed* test *removed* *removed* *removed* *removed*. Capitalized *removed*. This is a bunch of other safe text."
-        .to_string()
-    );
-
-  let has_slurs_vec = vec![
-    "Niggerz",
-    "coons",
-    "dindu",
-    "ladyboy",
-    "retardeds",
-    "tranny",
-  ];
-  let has_slurs_err_str = "No slurs - Niggerz, coons, dindu, ladyboy, retardeds, tranny";
-
-  assert_eq!(slur_check(test), Err(has_slurs_vec));
-  assert_eq!(slur_check(slur_free), Ok(()));
-  if let Err(slur_vec) = slur_check(test) {
-    assert_eq!(&slurs_vec_to_str(slur_vec), has_slurs_err_str);
-  }
 }
 
 // These helped with testing

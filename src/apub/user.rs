@@ -34,7 +34,7 @@ use lemmy_db::{
 use lemmy_structs::blocking;
 use lemmy_utils::{
   location_info,
-  utils::{check_slurs, check_slurs_opt, convert_datetime},
+  utils::convert_datetime,
   LemmyError,
 };
 use serde::Deserialize;

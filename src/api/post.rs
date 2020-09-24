@@ -26,7 +26,7 @@ use lemmy_structs::{
 };
 use lemmy_utils::{
   apub::{make_apub_endpoint, EndpointType},
-  utils::{check_slurs, check_slurs_opt, is_valid_post_title},
+  utils::is_valid_post_title,
   APIError,
   ConnectionId,
   LemmyError,

@@ -49,7 +49,7 @@ use lemmy_structs::blocking;
 use lemmy_utils::{
   apub::get_apub_protocol_string,
   location_info,
-  utils::{check_slurs, check_slurs_opt, convert_datetime},
+  utils::convert_datetime,
   LemmyError,
 };
 use serde::Deserialize;

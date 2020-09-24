@@ -9,6 +9,8 @@ docker/federation-test/volumes
 .git
 ansible
 
+target
+
 # exceptions, needed for federation-test build
 
 !server/target/debug/lemmy_server

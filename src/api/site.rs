@@ -31,7 +31,6 @@ use lemmy_structs::{
 use lemmy_utils::{
   location_info,
   settings::Settings,
-  utils::{check_slurs, check_slurs_opt},
   APIError,
   ConnectionId,
   LemmyError,

@@ -1,13 +1,12 @@
-use crate::{settings::Settings, APIError};
+use crate::settings::Settings;
 use actix_web::dev::ConnectionInfo;
 use chrono::{DateTime, FixedOffset, Local, NaiveDateTime};
 use itertools::Itertools;
 use rand::{distributions::Alphanumeric, thread_rng, Rng};
-use regex::{Regex, RegexBuilder};
+use regex::Regex;
 
 lazy_static! {
 static ref EMAIL_REGEX: Regex = Regex::new(r"^[a-zA-Z0-9.!#$%&’*+/=?^_`{|}~-]+@[a-zA-Z0-9-]+(?:\.[a-zA-Z0-9-]+)*$").unwrap();
-static ref SLUR_REGEX: Regex = RegexBuilder::new(r"(fag(g|got|tard)?|maricos?|cock\s?sucker(s|ing)?|\bn(i|1)g(\b|g?(a|er)?(s|z)?)\b|dindu(s?)|mudslime?s?|kikes?|mongoloids?|towel\s*heads?|\bspi(c|k)s?\b|\bchinks?|niglets?|beaners?|\bnips?\b|\bcoons?\b|jungle\s*bunn(y|ies?)|jigg?aboo?s?|\bpakis?\b|rag\s*heads?|gooks?|cunts?|bitch(es|ing|y)?|puss(y|ies?)|twats?|feminazis?|whor(es?|ing)|\bslut(s|t?y)?|\btr(a|@)nn?(y|ies?)|ladyboy(s?)|\b(b|re|r)tard(ed)?s?)").case_insensitive(true).build().unwrap();
 static ref USERNAME_MATCHES_REGEX: Regex = Regex::new(r"/u/[a-zA-Z][0-9a-zA-Z_]*").unwrap();
 // TODO keep this old one, it didn't work with port well tho
 // static ref MENTIONS_REGEX: Regex = Regex::new(r"@(?P<name>[\w.]+)@(?P<domain>[a-zA-Z0-9._-]+\.[a-zA-Z0-9_-]+)").unwrap();
@@ -26,43 +25,9 @@ pub fn convert_datetime(datetime: NaiveDateTime) -> DateTime<FixedOffset> {
   DateTime::<FixedOffset>::from_utc(datetime, *now.offset())
 }
 
-pub fn remove_slurs(test: &str) -> String {
-  SLUR_REGEX.replace_all(test, "*removed*").to_string()
-}
-
-pub(crate) fn slur_check(test: &str) -> Result<(), Vec<&str>> {
-  let mut matches: Vec<&str> = SLUR_REGEX.find_iter(test).map(|mat| mat.as_str()).collect();
-
-  // Unique
-  matches.sort_unstable();
-  matches.dedup();
-
-  if matches.is_empty() {
-    Ok(())
-  } else {
-    Err(matches)
-  }
-}
-
-pub fn check_slurs(text: &str) -> Result<(), APIError> {
-  if let Err(slurs) = slur_check(text) {
-    Err(APIError::err(&slurs_vec_to_str(slurs)))
-  } else {
-    Ok(())
-  }
-}
-
-pub fn check_slurs_opt(text: &Option<String>) -> Result<(), APIError> {
-  match text {
-    Some(t) => check_slurs(t),
-    None => Ok(()),
-  }
-}
-
-pub(crate) fn slurs_vec_to_str(slurs: Vec<&str>) -> String {
-  let start = "No slurs - ";
-  let combined = &slurs.join(", ");
-  [start, combined].concat()
+// FIXME: Find a way to delete this shit.
+pub fn fake_remove_slurs(test: &str) -> String {
+  test.to_string()
 }
 
 pub fn generate_random_string() -> String {
