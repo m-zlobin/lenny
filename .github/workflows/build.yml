@@ -12,10 +12,6 @@ jobs:
   backend:
     runs-on: ubuntu-latest
 
-    defaults:
-      run:
-        working-directory: server
-
     env:
       DATABASE_URL: "postgres://lenny:password@localhost:5432/lenny"
       LEMMY_DATABASE_URL: "postgres://lenny:password@localhost:5432/lenny"
