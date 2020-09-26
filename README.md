@@ -1,5 +1,5 @@
 <p align="center">
-  <img width=200px height=200px src="ui/assets/favicon.svg">
+  <img width=200px height=200px src="https://raw.githubusercontent.com/innereq/lenny-ui/downstream/src/assets/icons/favicon.svg">
   <h3 align="center">( ͡° ͜ʖ ͡°)</h3>
 </p>
 
@@ -32,27 +32,44 @@ This is bullshit.
 
 # Development
 
-The easiest way to build this project is using Podman (or Docker).
+For development environment you should have installed Rust toolchain and Node.js.
 
-Take a look at [`shtripok/rust-musl-builder`](https://hub.docker.com/r/shtripok/rust-musl-builder) container. You can use it both in coding process and building production images.
-
-Here is an example how to setup a coding environment:
+## Backend
 
 ```bash
+pacman -S rustup nodejs yarn npm
+rustup update nightly
 git clone https://github.com/innereq/lenny && cd lenny
-podman pull shtripok/rust-musl-builder:arm
-podman run -it --rm -v ./:/home/rust/src:Z shtripok/rust-musl-builder:arm /bin/bash
-cd server && cargo build
+cargo build
 ```
 
-To build a production container image:
+To build a production container you could use Podman or Docker.
 
 ```bash
 podman build -t lenny -f ./docker/prod/Dockerfile .
 ```
 
-To use public container registry:
+## Frontend
+
+Frontend now is a separated standalone project.
 
 ```bash
-podman pull quay.io/innereq/lenny
+git clone https://github.com/innereq/lenny-ui && cd lenny-ui
+yarn
+yarn build
+```
+
+To build a production container you could use Podman or Docker.
+
+```bash
+podman build -t lenny-ui .
+```
+
+# Deploying
+
+You can use our prebuilt container or build your own. Remember to choose a tag.
+
+```
+podman pull podman pull quay.io/innereq/lenny
+podman pull podman pull quay.io/innereq/lenny-ui
 ```

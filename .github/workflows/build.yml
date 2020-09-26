@@ -39,10 +39,6 @@ jobs:
           override: true
           components: "rustfmt, clippy"
 
-      - name: "Lint backend code"
-        run: |
-          cargo clippy -- -D clippy::style -D clippy::correctness -D clippy::complexity -D clippy::perf
-
       - name: "Build backend code"
         run: |
           cargo build
@@ -57,26 +53,6 @@ jobs:
           sudo apt-get install espeak
           cargo test --workspace
 
-  frontend:
-    runs-on: ubuntu-latest
-
-    defaults:
-      run:
-        working-directory: ui
-
-    steps:
-      - uses: actions/checkout@v2
-
-      - name: "Install Node toolchain"
-        uses: actions/setup-node@v1
-        with:
-          node-version: 12
-      
-      - name: "Build frontend code"
+      - name: "Lint backend code"
         run: |
-          yarn
-          yarn build
-
-      - name: "Lint frontend code"
-        run: |
-          yarn lint
+          cargo clippy -- -D clippy::style -D clippy::correctness -D clippy::complexity -D clippy::perf
