@@ -3,7 +3,6 @@ use crate::utils::{
   is_valid_post_title,
   is_valid_preferred_username,
   is_valid_username,
-  fake_remove_slurs,
   scrape_text_for_mentions,
 };
 
