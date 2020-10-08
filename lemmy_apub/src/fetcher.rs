@@ -27,9 +27,9 @@ use lemmy_db::{
 };
 use lemmy_structs::{blocking, site::SearchResponse};
 use lemmy_utils::{
-  apub::get_apub_protocol_string,
   location_info,
   request::{retry, RecvError},
+  settings::Settings,
   LemmyError,
 };
 use lemmy_websocket::LemmyContext;
@@ -55,9 +55,6 @@ where
 
   let timeout = Duration::from_secs(60);
 
-  // speed up tests
-  // before: 305s
-  // after: 240s
   let json = retry(|| {
     client
       .get(url.as_str())
@@ -117,7 +114,12 @@ pub async fn search_by_apub_id(
       return Err(anyhow!("Invalid search query: {}", query).into());
     };
 
-    let url = format!("{}://{}{}", get_apub_protocol_string(), instance, name);
+    let url = format!(
+      "{}://{}{}",
+      Settings::get().get_protocol_string(),
+      instance,
+      name
+    );
     Url::parse(&url)?
   } else {
     Url::parse(&query)?

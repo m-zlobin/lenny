@@ -12,6 +12,7 @@ pub struct Settings {
   pub hostname: String,
   pub bind: IpAddr,
   pub port: u16,
+  pub tls_enabled: bool,
   pub jwt_secret: String,
   pub pictrs_url: String,
   pub rate_limit: RateLimitConfig,
@@ -68,7 +69,6 @@ pub struct DatabaseConfig {
 #[derive(Debug, Deserialize, Clone)]
 pub struct FederationConfig {
   pub enabled: bool,
-  pub tls_enabled: bool,
   pub allowed_instances: String,
   pub blocked_instances: String,
 }
@@ -134,7 +134,7 @@ impl Settings {
       .federation
       .allowed_instances
       .split(',')
-      .map(|d| d.to_string())
+      .map(|d| d.trim().to_string())
       .collect();
 
     // The defaults.hjson config always returns a [""]
@@ -148,13 +148,28 @@ impl Settings {
       .federation
       .blocked_instances
       .split(',')
-      .map(|d| d.to_string())
+      .map(|d| d.trim().to_string())
       .collect();
 
     // The defaults.hjson config always returns a [""]
     blocked_instances.retain(|d| !d.eq(""));
 
     blocked_instances
+  }
+
+  /// Returns either "http" or "https", depending on tls_enabled setting
+  pub fn get_protocol_string(&self) -> &'static str {
+    if self.tls_enabled {
+      "https"
+    } else {
+      "http"
+    }
+  }
+
+  /// Returns something like `http://localhost` or `https://dev.lemmy.ml`,
+  /// with the correct protocol and hostname.
+  pub fn get_protocol_and_hostname(&self) -> String {
+    format!("{}://{}", self.get_protocol_string(), self.hostname)
   }
 
   pub fn save_config_file(data: &str) -> Result<String, Error> {

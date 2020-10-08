@@ -350,6 +350,7 @@ impl Perform for Search {
     let limit = data.limit;
     let sort = SortType::from_str(&data.sort)?;
     let community_id = data.community_id;
+    let community_name = data.community_name.to_owned();
     match type_ {
       SearchType::Posts => {
         posts = blocking(context.pool(), move |conn| {
@@ -357,6 +358,7 @@ impl Perform for Search {
             .sort(&sort)
             .show_nsfw(true)
             .for_community_id(community_id)
+            .for_community_name(community_name)
             .search_term(q)
             .my_user_id(user_id)
             .page(page)
@@ -405,6 +407,7 @@ impl Perform for Search {
             .sort(&sort)
             .show_nsfw(true)
             .for_community_id(community_id)
+            .for_community_name(community_name)
             .search_term(q)
             .my_user_id(user_id)
             .page(page)
@@ -459,6 +462,7 @@ impl Perform for Search {
             .sort(&sort)
             .show_nsfw(true)
             .for_community_id(community_id)
+            .for_community_name(community_name)
             .url_search(q)
             .page(page)
             .limit(limit)

@@ -1,7 +1,6 @@
 #[macro_use]
 extern crate lazy_static;
 
-pub mod activities;
 pub mod activity_queue;
 pub mod comment;
 pub mod community;
@@ -32,7 +31,6 @@ use chrono::NaiveDateTime;
 use lemmy_db::{activity::do_insert_activity, user::User_, DbPool};
 use lemmy_structs::{blocking, WebFingerResponse};
 use lemmy_utils::{
-  apub::get_apub_protocol_string,
   location_info,
   request::{retry, RecvError},
   settings::Settings,
@@ -44,6 +42,7 @@ use log::debug;
 use reqwest::Client;
 use serde::Serialize;
 use url::{ParseError, Url};
+use uuid::Uuid;
 
 type GroupExt = Ext2<ApActor<Group>, GroupExtension, PublicKeyExtension>;
 type PersonExt = Ext1<ApActor<Person>, PublicKeyExtension>;
@@ -97,14 +96,15 @@ fn check_is_apub_id_valid(apub_id: &Url) -> Result<(), LemmyError> {
     };
   }
 
-  if apub_id.scheme() != get_apub_protocol_string() {
+  if apub_id.scheme() != Settings::get().get_protocol_string() {
     return Err(anyhow!("invalid apub id scheme: {:?}", apub_id.scheme()).into());
   }
 
   let mut allowed_instances = Settings::get().get_allowed_instances();
   let blocked_instances = Settings::get().get_blocked_instances();
-
-  if !allowed_instances.is_empty() {
+  if allowed_instances.is_empty() && blocked_instances.is_empty() {
+    Ok(())
+  } else if !allowed_instances.is_empty() {
     // need to allow this explicitly because apub activities might contain objects from our local
     // instance. split is needed to remove the port in our federation test setup.
     allowed_instances.push(local_instance);
@@ -293,14 +293,6 @@ pub trait ActorType {
     Url::parse(&format!("{}/followers", &self.actor_id_str()))
   }
 
-  fn get_following_url(&self) -> String {
-    format!("{}/following", &self.actor_id_str())
-  }
-
-  fn get_liked_url(&self) -> String {
-    format!("{}/liked", &self.actor_id_str())
-  }
-
   fn get_public_key_ext(&self) -> Result<PublicKeyExtension, LemmyError> {
     Ok(
       PublicKey {
@@ -319,7 +311,7 @@ pub async fn fetch_webfinger_url(
 ) -> Result<Url, LemmyError> {
   let fetch_url = format!(
     "{}://{}/.well-known/webfinger?resource=acct:{}@{}",
-    get_apub_protocol_string(),
+    Settings::get().get_protocol_string(),
     mention.domain,
     mention.name,
     mention.domain
@@ -360,4 +352,17 @@ where
   })
   .await??;
   Ok(())
+}
+
+pub(in crate) fn generate_activity_id<T>(kind: T) -> Result<Url, ParseError>
+where
+  T: ToString,
+{
+  let id = format!(
+    "{}/activities/{}/{}",
+    Settings::get().get_protocol_and_hostname(),
+    kind.to_string().to_lowercase(),
+    Uuid::new_v4()
+  );
+  Url::parse(&id)
 }
