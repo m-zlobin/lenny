@@ -165,7 +165,6 @@ impl FromApub for PostForm {
       .map(|c| c.as_single_xsd_string())
       .flatten()
       .map(|s| s.to_string());
-    check_slurs(&name)?;
     let fake_body_slurs_removed = body.map(|b| fake_remove_slurs(&b));
     Ok(PostForm {
       name,
