@@ -23,7 +23,7 @@ use lemmy_structs::blocking;
 use lemmy_utils::{
   location_info,
   request::fetch_iframely_and_pictrs_data,
-  utils::{check_slurs, convert_datetime, remove_slurs},
+  utils::{convert_datetime, fake_remove_slurs},
   LemmyError,
 };
 use lemmy_websocket::LemmyContext;
@@ -166,11 +166,11 @@ impl FromApub for PostForm {
       .flatten()
       .map(|s| s.to_string());
     check_slurs(&name)?;
-    let body_slurs_removed = body.map(|b| remove_slurs(&b));
+    let fake_body_slurs_removed = body.map(|b| fake_remove_slurs(&b));
     Ok(PostForm {
       name,
       url,
-      body: body_slurs_removed,
+      body: fake_body_slurs_removed,
       creator_id: creator.id,
       community_id: community.id,
       removed: None,

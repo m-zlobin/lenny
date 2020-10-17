@@ -24,7 +24,7 @@ use lemmy_db::{
 use lemmy_structs::blocking;
 use lemmy_utils::{
   location_info,
-  utils::{convert_datetime, remove_slurs},
+  utils::{convert_datetime, fake_remove_slurs},
   LemmyError,
 };
 use lemmy_websocket::LemmyContext;
@@ -127,13 +127,13 @@ impl FromApub for CommentForm {
       .as_single_xsd_string()
       .context(location_info!())?
       .to_string();
-    let content_slurs_removed = remove_slurs(&content);
+    let fake_content_slurs_removed = fake_remove_slurs(&content);
 
     Ok(CommentForm {
       creator_id: creator.id,
       post_id: post.id,
       parent_id,
-      content: content_slurs_removed,
+      content: fake_content_slurs_removed,
       removed: None,
       read: None,
       published: note.published().map(|u| u.to_owned().naive_local()),

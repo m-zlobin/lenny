@@ -24,7 +24,7 @@ use lemmy_db::{
 use lemmy_structs::blocking;
 use lemmy_utils::{
   location_info,
-  utils::{check_slurs, check_slurs_opt, convert_datetime},
+  utils::convert_datetime,
   LemmyError,
 };
 use lemmy_websocket::LemmyContext;
@@ -147,9 +147,6 @@ impl FromApub for CommunityForm {
       .map(|s| s.as_single_xsd_string())
       .flatten()
       .map(|s| s.to_string());
-    check_slurs(&name)?;
-    check_slurs(&title)?;
-    check_slurs_opt(&description)?;
 
     let icon = match group.icon() {
       Some(any_image) => Some(
