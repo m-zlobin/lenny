@@ -9,9 +9,9 @@
 
 To maintain stability, this fork has a little no changes, but:
 - the main reason, completely removed “slur filter” — the ugliest way to block words;
-- a bit cleaned up UI — removed “sponsors” page and useless right-down panel;
+- a bit cleaned up UI — removed ~~“sponsors” page~~ (upstreamed!) and useless right-down panel;
 - new default themes — Pleroma, based on themes of the [Pleroma project](https://pleroma.social);
-- ~~allowed `<sub>text</sub>` and `<sup>text</sup>` HTML tags as `~text~` and `^text^`~~ upstreamed!;
+- ~~allowed `<sub>text</sub>` and `<sup>text</sup>` HTML tags as `~text~` and `^text^`~~ (upstreamed!);
 - a muffin logo (by [MLP Vector Club](https://mlpvector.club)).
 
 # The Lemmy Problem
