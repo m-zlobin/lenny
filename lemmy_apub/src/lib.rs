@@ -22,7 +22,7 @@ use activitystreams::{
 };
 use activitystreams_ext::{Ext1, Ext2};
 use anyhow::{anyhow, Context};
-use lemmy_db::{activity::do_insert_activity, user::User_, DbPool};
+use lemmy_db::{activity::Activity, user::User_, DbPool};
 use lemmy_structs::blocking;
 use lemmy_utils::{location_info, settings::Settings, LemmyError};
 use lemmy_websocket::LemmyContext;
@@ -129,6 +129,7 @@ pub trait FromApub {
     apub: &Self::ApubType,
     context: &LemmyContext,
     expected_domain: Option<Url>,
+    request_counter: &mut i32,
   ) -> Result<Self, LemmyError>
   where
     Self: Sized;
@@ -168,9 +169,6 @@ pub trait ActorType {
   fn public_key(&self) -> Option<String>;
   fn private_key(&self) -> Option<String>;
 
-  /// numeric id in the database, used for insert_activity
-  fn user_id(&self) -> i32;
-
   async fn send_follow(
     &self,
     follow_actor_id: &Url,
@@ -188,20 +186,15 @@ pub trait ActorType {
     context: &LemmyContext,
   ) -> Result<(), LemmyError>;
 
-  async fn send_delete(&self, creator: &User_, context: &LemmyContext) -> Result<(), LemmyError>;
-  async fn send_undo_delete(
-    &self,
-    creator: &User_,
-    context: &LemmyContext,
-  ) -> Result<(), LemmyError>;
+  async fn send_delete(&self, context: &LemmyContext) -> Result<(), LemmyError>;
+  async fn send_undo_delete(&self, context: &LemmyContext) -> Result<(), LemmyError>;
 
-  async fn send_remove(&self, mod_: &User_, context: &LemmyContext) -> Result<(), LemmyError>;
-  async fn send_undo_remove(&self, mod_: &User_, context: &LemmyContext) -> Result<(), LemmyError>;
+  async fn send_remove(&self, context: &LemmyContext) -> Result<(), LemmyError>;
+  async fn send_undo_remove(&self, context: &LemmyContext) -> Result<(), LemmyError>;
 
   async fn send_announce(
     &self,
     activity: AnyBase,
-    sender: &User_,
     context: &LemmyContext,
   ) -> Result<(), LemmyError>;
 
@@ -255,16 +248,18 @@ pub trait ActorType {
 /// Store a sent or received activity in the database, for logging purposes. These records are not
 /// persistent.
 pub async fn insert_activity<T>(
-  user_id: i32,
-  data: T,
+  ap_id: &Url,
+  activity: T,
   local: bool,
+  sensitive: bool,
   pool: &DbPool,
 ) -> Result<(), LemmyError>
 where
   T: Serialize + std::fmt::Debug + Send + 'static,
 {
+  let ap_id = ap_id.to_string();
   blocking(pool, move |conn| {
-    do_insert_activity(conn, user_id, &data, local)
+    Activity::insert(conn, ap_id, &activity, local, sensitive)
   })
   .await??;
   Ok(())
