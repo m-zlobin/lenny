@@ -4,7 +4,6 @@ use crate::{
   check_is_apub_id_valid,
   fetcher::get_or_fetch_and_upsert_user,
   ActorType,
-  ToApub,
 };
 use activitystreams::{
   activity::{
@@ -23,7 +22,7 @@ use activitystreams::{
 };
 use anyhow::Context;
 use itertools::Itertools;
-use lemmy_db::{community::Community, community_view::CommunityFollowerView, user::User_, DbPool};
+use lemmy_db::{community::Community, community_view::CommunityFollowerView, DbPool};
 use lemmy_structs::blocking;
 use lemmy_utils::{location_info, settings::Settings, LemmyError};
 use lemmy_websocket::LemmyContext;
@@ -40,10 +39,6 @@ impl ActorType for Community {
   }
   fn private_key(&self) -> Option<String> {
     self.private_key.to_owned()
-  }
-
-  fn user_id(&self) -> i32 {
-    self.creator_id
   }
 
   async fn send_follow(
@@ -72,7 +67,7 @@ impl ActorType for Community {
       .actor()?
       .as_single_xsd_any_uri()
       .context(location_info!())?;
-    let user = get_or_fetch_and_upsert_user(actor_uri, context).await?;
+    let user = get_or_fetch_and_upsert_user(actor_uri, context, &mut 0).await?;
 
     let mut accept = Accept::new(self.actor_id.to_owned(), follow.into_any_base()?);
     accept
@@ -85,62 +80,54 @@ impl ActorType for Community {
   }
 
   /// If the creator of a community deletes the community, send this to all followers.
-  async fn send_delete(&self, creator: &User_, context: &LemmyContext) -> Result<(), LemmyError> {
-    let group = self.to_apub(context.pool()).await?;
-
-    let mut delete = Delete::new(creator.actor_id.to_owned(), group.into_any_base()?);
+  async fn send_delete(&self, context: &LemmyContext) -> Result<(), LemmyError> {
+    let mut delete = Delete::new(self.actor_id()?, self.actor_id()?);
     delete
       .set_context(activitystreams::context())
       .set_id(generate_activity_id(DeleteType::Delete)?)
       .set_to(public())
       .set_many_ccs(vec![self.get_followers_url()?]);
 
-    send_to_community_followers(delete, self, context, None).await?;
+    send_to_community_followers(delete, self, context).await?;
     Ok(())
   }
 
   /// If the creator of a community reverts the deletion of a community, send this to all followers.
-  async fn send_undo_delete(
-    &self,
-    creator: &User_,
-    context: &LemmyContext,
-  ) -> Result<(), LemmyError> {
-    let group = self.to_apub(context.pool()).await?;
-
-    let mut delete = Delete::new(creator.actor_id.to_owned(), group.into_any_base()?);
+  async fn send_undo_delete(&self, context: &LemmyContext) -> Result<(), LemmyError> {
+    let mut delete = Delete::new(self.actor_id()?, self.actor_id()?);
     delete
       .set_context(activitystreams::context())
       .set_id(generate_activity_id(DeleteType::Delete)?)
       .set_to(public())
       .set_many_ccs(vec![self.get_followers_url()?]);
 
-    let mut undo = Undo::new(creator.actor_id.to_owned(), delete.into_any_base()?);
+    let mut undo = Undo::new(self.actor_id()?, delete.into_any_base()?);
     undo
       .set_context(activitystreams::context())
       .set_id(generate_activity_id(UndoType::Undo)?)
       .set_to(public())
       .set_many_ccs(vec![self.get_followers_url()?]);
 
-    send_to_community_followers(undo, self, context, None).await?;
+    send_to_community_followers(undo, self, context).await?;
     Ok(())
   }
 
   /// If an admin removes a community, send this to all followers.
-  async fn send_remove(&self, mod_: &User_, context: &LemmyContext) -> Result<(), LemmyError> {
-    let mut remove = Remove::new(mod_.actor_id.to_owned(), self.actor_id()?);
+  async fn send_remove(&self, context: &LemmyContext) -> Result<(), LemmyError> {
+    let mut remove = Remove::new(self.actor_id()?, self.actor_id()?);
     remove
       .set_context(activitystreams::context())
       .set_id(generate_activity_id(RemoveType::Remove)?)
       .set_to(public())
       .set_many_ccs(vec![self.get_followers_url()?]);
 
-    send_to_community_followers(remove, self, context, None).await?;
+    send_to_community_followers(remove, self, context).await?;
     Ok(())
   }
 
   /// If an admin reverts the removal of a community, send this to all followers.
-  async fn send_undo_remove(&self, mod_: &User_, context: &LemmyContext) -> Result<(), LemmyError> {
-    let mut remove = Remove::new(mod_.actor_id.to_owned(), self.actor_id()?);
+  async fn send_undo_remove(&self, context: &LemmyContext) -> Result<(), LemmyError> {
+    let mut remove = Remove::new(self.actor_id()?, self.actor_id()?);
     remove
       .set_context(activitystreams::context())
       .set_id(generate_activity_id(RemoveType::Remove)?)
@@ -148,14 +135,14 @@ impl ActorType for Community {
       .set_many_ccs(vec![self.get_followers_url()?]);
 
     // Undo that fake activity
-    let mut undo = Undo::new(mod_.actor_id.to_owned(), remove.into_any_base()?);
+    let mut undo = Undo::new(self.actor_id()?, remove.into_any_base()?);
     undo
       .set_context(activitystreams::context())
       .set_id(generate_activity_id(LikeType::Like)?)
       .set_to(public())
       .set_many_ccs(vec![self.get_followers_url()?]);
 
-    send_to_community_followers(undo, self, context, None).await?;
+    send_to_community_followers(undo, self, context).await?;
     Ok(())
   }
 
@@ -164,7 +151,6 @@ impl ActorType for Community {
   async fn send_announce(
     &self,
     activity: AnyBase,
-    sender: &User_,
     context: &LemmyContext,
   ) -> Result<(), LemmyError> {
     let mut announce = Announce::new(self.actor_id.to_owned(), activity);
@@ -174,13 +160,7 @@ impl ActorType for Community {
       .set_to(public())
       .set_many_ccs(vec![self.get_followers_url()?]);
 
-    send_to_community_followers(
-      announce,
-      self,
-      context,
-      Some(sender.get_shared_inbox_url()?),
-    )
-    .await?;
+    send_to_community_followers(announce, self, context).await?;
 
     Ok(())
   }

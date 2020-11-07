@@ -396,7 +396,7 @@ Sent to: Community
 | Field Name | Mandatory | Description |
 |---|---|---|
 | `tag` | no | List of users which are mentioned in the comment (like `@user@example.com`) |
-| `cc` | yes | Community where the post is being made, as well as any mentioned users |
+| `cc` | yes | Community where the post is being made, the user being replied to (creator of the parent post/comment), as well as any mentioned users |
 | `object` | yes | The comment being created |
 
 ### Like Post or Comment
@@ -558,6 +558,56 @@ Sent to: User
 | Field Name | Mandatory | Description |
 |---|---|---|
 | `object` | yes | Any `Create`, `Update`, `Like`, `Dislike`, `Delete` `Remove` or `Undo` activity as described above |
+
+### Remove or Delete Community
+
+```json
+{
+  "@context": "https://www.w3.org/ns/activitystreams",
+  "id": "http://ds9.lemmy.ml/activities/remove/e4ca7688-af9d-48b7-864f-765e7f9f3591",
+  "type": "Remove",
+  "actor": "http://ds9.lemmy.ml/c/some_community",
+  "cc": [
+    "http://ds9.lemmy.ml/c/some_community/followers"
+  ],
+  "to": "https://www.w3.org/ns/activitystreams#Public",
+  "object": "http://ds9.lemmy.ml/c/some_community"
+}
+```
+
+| Field Name | Mandatory | Description |
+|---|---|---|
+| `type` | yes | Either `Remove` or `Delete` |
+
+### Restore Removed or Deleted Community 
+
+```json
+{
+  "@context": "https://www.w3.org/ns/activitystreams",
+  "id": "http://ds9.lemmy.ml/activities/like/0703668c-8b09-4a85-aa7a-f93621936901",
+  "type": "Undo",
+  "actor": "http://ds9.lemmy.ml/c/some_community",
+  "to": "https://www.w3.org/ns/activitystreams#Public",
+  "cc": [
+    "http://ds9.lemmy.ml/c/testcom/followers"
+  ],
+  "object": {
+    "@context": "https://www.w3.org/ns/activitystreams",
+    "id": "http://ds9.lemmy.ml/activities/remove/1062b5e0-07e8-44fc-868c-854209935bdd",
+    "type": "Remove",
+    "actor": "http://ds9.lemmy.ml/c/some_community",
+    "object": "http://ds9.lemmy.ml/c/testcom",
+    "to": "https://www.w3.org/ns/activitystreams#Public",
+    "cc": [
+      "http://ds9.lemmy.ml/c/testcom/followers"
+    ]
+  }
+}
+
+```
+| Field Name | Mandatory | Description |
+|---|---|---|
+| `object.type` | yes | Either `Remove` or `Delete` |
 
 ### Create or Update Private message 
 

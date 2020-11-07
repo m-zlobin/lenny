@@ -32,10 +32,6 @@ impl ActorType for User_ {
     self.private_key.to_owned()
   }
 
-  fn user_id(&self) -> i32 {
-    self.id
-  }
-
   /// As a given local user, send out a follow request to a remote community.
   async fn send_follow(
     &self,
@@ -94,34 +90,25 @@ impl ActorType for User_ {
     unimplemented!()
   }
 
-  async fn send_delete(&self, _creator: &User_, _context: &LemmyContext) -> Result<(), LemmyError> {
+  async fn send_delete(&self, _context: &LemmyContext) -> Result<(), LemmyError> {
     unimplemented!()
   }
 
-  async fn send_undo_delete(
-    &self,
-    _creator: &User_,
-    _context: &LemmyContext,
-  ) -> Result<(), LemmyError> {
+  async fn send_undo_delete(&self, _context: &LemmyContext) -> Result<(), LemmyError> {
     unimplemented!()
   }
 
-  async fn send_remove(&self, _creator: &User_, _context: &LemmyContext) -> Result<(), LemmyError> {
+  async fn send_remove(&self, _context: &LemmyContext) -> Result<(), LemmyError> {
     unimplemented!()
   }
 
-  async fn send_undo_remove(
-    &self,
-    _creator: &User_,
-    _context: &LemmyContext,
-  ) -> Result<(), LemmyError> {
+  async fn send_undo_remove(&self, _context: &LemmyContext) -> Result<(), LemmyError> {
     unimplemented!()
   }
 
   async fn send_announce(
     &self,
     _activity: AnyBase,
-    _sender: &User_,
     _context: &LemmyContext,
   ) -> Result<(), LemmyError> {
     unimplemented!()

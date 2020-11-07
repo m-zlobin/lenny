@@ -38,7 +38,7 @@ use lemmy_db::{
   ListingType,
   SortType,
 };
-use lemmy_structs::{blocking, user::*};
+use lemmy_structs::{blocking, send_email_to_user, user::*};
 use lemmy_utils::{
   apub::{generate_actor_keypair, make_apub_endpoint, EndpointType},
   email::send_email,
@@ -60,7 +60,6 @@ use lemmy_websocket::{
   LemmyContext,
   UserOperation,
 };
-use log::error;
 use std::str::FromStr;
 
 #[async_trait::async_trait(?Send)]
@@ -484,16 +483,30 @@ impl Perform for GetUserDetails {
       }
     };
 
-    let user_view = blocking(context.pool(), move |conn| {
-      UserView::get_user_secure(conn, user_details_id)
-    })
-    .await??;
+    let user_id = user.map(|u| u.id);
+    let user_fun = move |conn: &'_ _| {
+      match user_id {
+        // if there's a logged in user and it's the same id as the user whose details are being
+        // requested we need to use get_user_dangerous so it returns their email or other sensitive
+        // data hidden when viewing users other than yourself
+        Some(auth_user_id) => {
+          if user_details_id == auth_user_id {
+            UserView::get_user_dangerous(conn, auth_user_id)
+          } else {
+            UserView::get_user_secure(conn, user_details_id)
+          }
+        }
+        None => UserView::get_user_secure(conn, user_details_id),
+      }
+    };
+
+    let user_view = blocking(context.pool(), user_fun).await??;
 
     let page = data.page;
     let limit = data.limit;
     let saved_only = data.saved_only;
     let community_id = data.community_id;
-    let user_id = user.map(|u| u.id);
+
     let (posts, comments) = blocking(context.pool(), move |conn| {
       let mut posts_query = PostQueryBuilder::create(conn)
         .sort(&sort)
@@ -1025,23 +1038,12 @@ impl Perform for CreatePrivateMessage {
     let recipient_user =
       blocking(context.pool(), move |conn| User_::read(conn, recipient_id)).await??;
     if recipient_user.send_notifications_to_email {
-      if let Some(email) = recipient_user.email {
-        let subject = &format!(
-          "{} - Private Message from {}",
-          Settings::get().hostname,
-          user.name,
-        );
-        let html = &format!(
-          "<h1>Private Message</h1><br><div>{} - {}</div><br><a href={}/inbox>inbox</a>",
-          user.name,
-          &fake_content_slurs_removed,
-          Settings::get().get_protocol_and_hostname()
-        );
-        match send_email(subject, &email, &recipient_user.name, html) {
-          Ok(_o) => _o,
-          Err(e) => error!("{}", e),
-        };
-      }
+      send_email_to_user(
+        recipient_user,
+        "Private Message from",
+        "Private Message",
+        &fake_content_slurs_removed,
+      );
     }
 
     let message = blocking(context.pool(), move |conn| {
