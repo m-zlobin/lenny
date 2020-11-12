@@ -23,6 +23,8 @@ use crate::{
     get_activity_to_and_cc,
     inbox_verify_http_signature,
     is_activity_already_known,
+    is_addressed_to_community_followers,
+    is_addressed_to_local_user,
     is_addressed_to_public,
     receive_for_community::{
       receive_create_for_community,
@@ -46,7 +48,7 @@ use actix_web::{web, HttpRequest, HttpResponse};
 use anyhow::{anyhow, Context};
 use diesel::NotFound;
 use lemmy_db::{
-  community::{Community, CommunityFollower, CommunityFollowerForm},
+  community::{Community, CommunityFollower},
   private_message::PrivateMessage,
   user::User_,
   Followable,
@@ -99,6 +101,7 @@ pub async fn user_inbox(
   })
   .await??;
   let to_and_cc = get_activity_to_and_cc(&activity)?;
+  // TODO: we should also accept activities that are sent to community followers
   if !to_and_cc.contains(&&user.actor_id()?) {
     return Err(anyhow!("Activity delivered to wrong user").into());
   }
@@ -130,9 +133,7 @@ pub(crate) async fn user_receive_message(
   context: &LemmyContext,
   request_counter: &mut i32,
 ) -> Result<HttpResponse, LemmyError> {
-  // TODO: must be addressed to one or more local users, or to followers of a remote community
-
-  // TODO: if it is addressed to community followers, check that at least one local user is following it
+  is_for_user_inbox(context, &activity).await?;
 
   let any_base = activity.clone().into_any_base()?;
   let kind = activity.kind().context(location_info!())?;
@@ -162,6 +163,41 @@ pub(crate) async fn user_receive_message(
   Ok(HttpResponse::Ok().finish())
 }
 
+/// Returns true if the activity is addressed directly to one or more local users, or if it is
+/// addressed to the followers collection of a remote community, and at least one local user follows
+/// it.
+async fn is_for_user_inbox(
+  context: &LemmyContext,
+  activity: &UserAcceptedActivities,
+) -> Result<(), LemmyError> {
+  let to_and_cc = get_activity_to_and_cc(activity)?;
+  // Check if it is addressed directly to any local user
+  if is_addressed_to_local_user(&to_and_cc, context.pool()).await? {
+    return Ok(());
+  }
+
+  // Check if it is addressed to any followers collection of a remote community, and that the
+  // community has local followers.
+  let community = is_addressed_to_community_followers(&to_and_cc, context.pool()).await?;
+  if let Some(c) = community {
+    let community_id = c.id;
+    let has_local_followers = blocking(&context.pool(), move |conn| {
+      CommunityFollower::has_local_followers(conn, community_id)
+    })
+    .await??;
+    if c.local {
+      return Err(
+        anyhow!("Remote activity cant be addressed to followers of local community").into(),
+      );
+    }
+    if has_local_followers {
+      return Ok(());
+    }
+  }
+
+  Err(anyhow!("Not addressed for any local user").into())
+}
+
 /// Handle accepted follows.
 async fn receive_accept(
   context: &LemmyContext,
@@ -173,8 +209,6 @@ async fn receive_accept(
   let accept = Accept::from_any_base(activity)?.context(location_info!())?;
   verify_activity_domains_valid(&accept, &actor.actor_id()?, false)?;
 
-  // TODO: we should check that we actually sent this activity, because the remote instance
-  //       could just put a fake Follow
   let object = accept.object().to_owned().one().context(location_info!())?;
   let follow = Follow::from_any_base(object)?.context(location_info!())?;
   verify_activity_domains_valid(&follow, &user.actor_id()?, false)?;
@@ -188,17 +222,13 @@ async fn receive_accept(
   let community =
     get_or_fetch_and_upsert_community(&community_uri, context, request_counter).await?;
 
-  // Now you need to add this to the community follower
-  let community_follower_form = CommunityFollowerForm {
-    community_id: community.id,
-    user_id: user.id,
-  };
-
-  // This will fail if they're already a follower
+  let community_id = community.id;
+  let user_id = user.id;
+  // This will throw an error if no follow was requested
   blocking(&context.pool(), move |conn| {
-    CommunityFollower::follow(conn, &community_follower_form).ok()
+    CommunityFollower::follow_accepted(conn, community_id, user_id)
   })
-  .await?;
+  .await??;
 
   Ok(())
 }
