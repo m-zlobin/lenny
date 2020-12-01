@@ -3,7 +3,7 @@
   <h3 align="center">( ͡° ͜ʖ ͡°)</h3>
 </p>
 
-[![](https://github.com/innereq/lenny/workflows/Continuous%20Integration/badge.svg)](https://github.com/innereq/lenny/actions?query=workflow%3A"Continuous+Integration") [![](https://quay.io/repository/innereq/lenny/status)](https://quay.io/repository/innereq/lenny)
+[![](https://github.com/innereq/lenny/workflows/Continuous%20Integration/badge.svg)](https://github.com/innereq/lenny/actions?query=workflow%3A"Continuous+Integration") [![](https://github.com/innereq/lenny/workflows/Build%20Lenny%20on%20Push%20and%20Daily/badge.svg)](https://github.com/innereq/lenny/actions?query=workflow%3A"Build+Lenny+on+Push+and+Daily")
 
 **Lenny** is a fork of a link aggregator — [Lemmy](https://github.com/LemmyNet/lemmy). Sadly, it only exist because of disrespectful behavior of the original author.
 
@@ -70,6 +70,6 @@ podman build -t lenny-ui .
 You can use our prebuilt container or build your own. Remember to choose a tag.
 
 ```
-podman pull podman pull quay.io/innereq/lenny
-podman pull podman pull quay.io/innereq/lenny-ui
+podman pull podman pull ghcr.io/innereq/containers/lenny
+podman pull podman pull ghcr.io/innereq/containers/lenny-ui
 ```
