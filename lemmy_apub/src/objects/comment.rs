@@ -134,7 +134,7 @@ impl FromApub for CommentForm {
     };
 
     let content = get_source_markdown_value(note)?.context(location_info!())?;
-    let content_slurs_removed = fake_remove_slurs(&content);
+    let fake_content_slurs_removed = fake_remove_slurs(&content);
 
     Ok(CommentForm {
       creator_id: creator.id,
