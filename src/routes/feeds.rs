@@ -16,9 +16,15 @@ use lemmy_db::{
 use lemmy_structs::blocking;
 use lemmy_utils::{settings::Settings, utils::markdown_to_html, LemmyError};
 use lemmy_websocket::LemmyContext;
-use rss::{CategoryBuilder, ChannelBuilder, GuidBuilder, Item, ItemBuilder};
+use rss::{
+  extension::dublincore::DublinCoreExtensionBuilder,
+  ChannelBuilder,
+  GuidBuilder,
+  Item,
+  ItemBuilder,
+};
 use serde::Deserialize;
-use std::str::FromStr;
+use std::{collections::HashMap, str::FromStr};
 use strum::ParseError;
 
 #[derive(Deserialize)]
@@ -36,7 +42,19 @@ enum RequestType {
 pub fn config(cfg: &mut web::ServiceConfig) {
   cfg
     .route("/feeds/{type}/{name}.xml", web::get().to(get_feed))
-    .route("/feeds/all.xml", web::get().to(get_all_feed));
+    .route("/feeds/all.xml", web::get().to(get_all_feed))
+    .route("/feeds/local.xml", web::get().to(get_local_feed));
+}
+
+lazy_static! {
+  static ref RSS_NAMESPACE: HashMap<String, String> = {
+    let mut h = HashMap::new();
+    h.insert(
+      "dc".to_string(),
+      rss::extension::dublincore::NAMESPACE.to_string(),
+    );
+    h
+  };
 }
 
 async fn get_all_feed(
@@ -44,33 +62,43 @@ async fn get_all_feed(
   context: web::Data<LemmyContext>,
 ) -> Result<HttpResponse, Error> {
   let sort_type = get_sort_type(info).map_err(ErrorBadRequest)?;
-
-  let rss = blocking(context.pool(), move |conn| {
-    get_feed_all_data(conn, &sort_type)
-  })
-  .await?
-  .map_err(ErrorBadRequest)?;
-
-  Ok(
-    HttpResponse::Ok()
-      .content_type("application/rss+xml")
-      .body(rss),
-  )
+  Ok(get_feed_data(&context, ListingType::All, sort_type).await?)
 }
 
-fn get_feed_all_data(conn: &PgConnection, sort_type: &SortType) -> Result<String, LemmyError> {
-  let site_view = SiteView::read(&conn)?;
+async fn get_local_feed(
+  info: web::Query<Params>,
+  context: web::Data<LemmyContext>,
+) -> Result<HttpResponse, Error> {
+  let sort_type = get_sort_type(info).map_err(ErrorBadRequest)?;
+  Ok(get_feed_data(&context, ListingType::Local, sort_type).await?)
+}
 
-  let posts = PostQueryBuilder::create(&conn)
-    .listing_type(ListingType::All)
-    .sort(sort_type)
-    .list()?;
+async fn get_feed_data(
+  context: &LemmyContext,
+  listing_type: ListingType,
+  sort_type: SortType,
+) -> Result<HttpResponse, LemmyError> {
+  let site_view = blocking(context.pool(), move |conn| SiteView::read(&conn)).await??;
+
+  let listing_type_ = listing_type.clone();
+  let posts = blocking(context.pool(), move |conn| {
+    PostQueryBuilder::create(&conn)
+      .listing_type(&listing_type_)
+      .sort(&sort_type)
+      .list()
+  })
+  .await??;
 
   let items = create_post_items(posts)?;
 
   let mut channel_builder = ChannelBuilder::default();
   channel_builder
-    .title(&format!("{} - All", site_view.name))
+    .namespaces(RSS_NAMESPACE.to_owned())
+    .title(&format!(
+      "{} - {}",
+      site_view.name,
+      listing_type.to_string()
+    ))
     .link(Settings::get().get_protocol_and_hostname())
     .items(items);
 
@@ -78,7 +106,12 @@ fn get_feed_all_data(conn: &PgConnection, sort_type: &SortType) -> Result<String
     channel_builder.description(&site_desc);
   }
 
-  Ok(channel_builder.build().map_err(|e| anyhow!(e))?.to_string())
+  let rss = channel_builder.build().map_err(|e| anyhow!(e))?.to_string();
+  Ok(
+    HttpResponse::Ok()
+      .content_type("application/rss+xml")
+      .body(rss),
+  )
 }
 
 async fn get_feed(
@@ -132,7 +165,7 @@ fn get_feed_user(
   let user_url = user.get_profile_url(&Settings::get().hostname);
 
   let posts = PostQueryBuilder::create(&conn)
-    .listing_type(ListingType::All)
+    .listing_type(&ListingType::All)
     .sort(sort_type)
     .for_creator_id(user.id)
     .list()?;
@@ -141,6 +174,7 @@ fn get_feed_user(
 
   let mut channel_builder = ChannelBuilder::default();
   channel_builder
+    .namespaces(RSS_NAMESPACE.to_owned())
     .title(&format!("{} - {}", site_view.name, user.name))
     .link(user_url)
     .items(items);
@@ -157,7 +191,7 @@ fn get_feed_community(
   let community = Community::read_from_name(&conn, &community_name)?;
 
   let posts = PostQueryBuilder::create(&conn)
-    .listing_type(ListingType::All)
+    .listing_type(&ListingType::All)
     .sort(sort_type)
     .for_community_id(community.id)
     .list()?;
@@ -166,6 +200,7 @@ fn get_feed_community(
 
   let mut channel_builder = ChannelBuilder::default();
   channel_builder
+    .namespaces(RSS_NAMESPACE.to_owned())
     .title(&format!("{} - {}", site_view.name, community.name))
     .link(community.actor_id)
     .items(items);
@@ -186,7 +221,7 @@ fn get_feed_front(
   let user_id = Claims::decode(&jwt)?.claims.id;
 
   let posts = PostQueryBuilder::create(&conn)
-    .listing_type(ListingType::Subscribed)
+    .listing_type(&ListingType::Subscribed)
     .sort(sort_type)
     .my_user_id(user_id)
     .list()?;
@@ -195,6 +230,7 @@ fn get_feed_front(
 
   let mut channel_builder = ChannelBuilder::default();
   channel_builder
+    .namespaces(RSS_NAMESPACE.to_owned())
     .title(&format!("{} - Subscribed", site_view.name))
     .link(Settings::get().get_protocol_and_hostname())
     .items(items);
@@ -224,6 +260,7 @@ fn get_feed_inbox(conn: &PgConnection, jwt: String) -> Result<ChannelBuilder, Le
 
   let mut channel_builder = ChannelBuilder::default();
   channel_builder
+    .namespaces(RSS_NAMESPACE.to_owned())
     .title(&format!("{} - Inbox", site_view.name))
     .link(format!(
       "{}/inbox",
@@ -310,18 +347,11 @@ fn create_post_items(posts: Vec<PostView>) -> Result<Vec<Item>, LemmyError> {
 
   for p in posts {
     let mut i = ItemBuilder::default();
+    let mut dc_extension = DublinCoreExtensionBuilder::default();
 
     i.title(p.name);
 
-    let author_url = format!(
-      "{}/u/{}",
-      Settings::get().get_protocol_and_hostname(),
-      p.creator_name
-    );
-    i.author(format!(
-      "/u/{} <a href=\"{}\">(link)</a>",
-      p.creator_name, author_url
-    ));
+    dc_extension.creators(vec![p.creator_actor_id.to_owned()]);
 
     let dt = DateTime::<Utc>::from_utc(p.published, Utc);
     i.pub_date(dt.to_rfc2822());
@@ -345,16 +375,8 @@ fn create_post_items(posts: Vec<PostView>) -> Result<Vec<Item>, LemmyError> {
       p.community_name
     );
 
-    let category = CategoryBuilder::default()
-      .name(format!(
-        "/c/{} <a href=\"{}\">(link)</a>",
-        p.community_name, community_url
-      ))
-      .domain(Settings::get().hostname.to_owned())
-      .build()
-      .map_err(|e| anyhow!(e))?;
-
-    i.categories(vec![category]);
+    // TODO: for category we should just put the name of the category, but then we would have
+    //       to read each community from the db
 
     if let Some(url) = p.url {
       i.link(url);
@@ -362,7 +384,7 @@ fn create_post_items(posts: Vec<PostView>) -> Result<Vec<Item>, LemmyError> {
 
     // TODO add images
     let mut description = format!("submitted by <a href=\"{}\">{}</a> to <a href=\"{}\">{}</a><br>{} points | <a href=\"{}\">{} comments</a>",
-    author_url,
+    p.creator_actor_id,
     p.creator_name,
     community_url,
     p.community_name,
@@ -377,6 +399,7 @@ fn create_post_items(posts: Vec<PostView>) -> Result<Vec<Item>, LemmyError> {
 
     i.description(description);
 
+    i.dublin_core_ext(dc_extension.build().map_err(|e| anyhow!(e))?);
     items.push(i.build().map_err(|e| anyhow!(e))?);
   }
 
