@@ -760,6 +760,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "clokwerk"
+version = "0.3.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f9797a6d3acefa28d4cc62bf548b6ddc57b8ae51a43702d001cb46fba1dc48c1"
+dependencies = [
+ "chrono",
+]
+
+[[package]]
 name = "color_quant"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1021,6 +1030,17 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "diesel_json"
+version = "0.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2812f0f63b6d3508fb7bfdb872c2dc2321ba938f5e0f4cb9751ec899e8b297c9"
+dependencies = [
+ "diesel",
+ "serde 1.0.118",
+ "serde_json",
 ]
 
 [[package]]
@@ -1794,6 +1814,7 @@ dependencies = [
  "bcrypt",
  "chrono",
  "diesel",
+ "diesel_json",
  "diesel_migrations",
  "lazy_static",
  "lemmy_db_schema",
@@ -1865,6 +1886,7 @@ dependencies = [
  "awc",
  "cargo-husky",
  "chrono",
+ "clokwerk",
  "diesel",
  "diesel_migrations",
  "env_logger",
@@ -1908,6 +1930,7 @@ dependencies = [
  "log",
  "serde 1.0.118",
  "serde_json",
+ "url",
 ]
 
 [[package]]
