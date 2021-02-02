@@ -1,10 +1,10 @@
 use crate::{
+  build_federated_instances,
   get_user_from_jwt,
   get_user_from_jwt_opt,
   get_user_safe_settings_from_jwt,
   get_user_safe_settings_from_jwt_opt,
   is_admin,
-  linked_instances,
   version,
   Perform,
 };
@@ -317,6 +317,7 @@ impl Perform for GetSite {
       .unwrap_or(1);
 
     let my_user = get_user_safe_settings_from_jwt_opt(&data.auth, context.pool()).await?;
+    let federated_instances = build_federated_instances(context.pool()).await?;
 
     Ok(GetSiteResponse {
       site_view,
@@ -325,7 +326,7 @@ impl Perform for GetSite {
       online,
       version: version::VERSION.to_string(),
       my_user,
-      federated_instances: linked_instances(context.pool()).await?,
+      federated_instances,
     })
   }
 }
@@ -543,6 +544,7 @@ impl Perform for TransferSite {
     admins.insert(0, creator_user);
 
     let banned = blocking(context.pool(), move |conn| UserViewSafe::banned(conn)).await??;
+    let federated_instances = build_federated_instances(context.pool()).await?;
 
     Ok(GetSiteResponse {
       site_view: Some(site_view),
@@ -551,7 +553,7 @@ impl Perform for TransferSite {
       online: 0,
       version: version::VERSION.to_string(),
       my_user: Some(user),
-      federated_instances: linked_instances(context.pool()).await?,
+      federated_instances,
     })
   }
 }

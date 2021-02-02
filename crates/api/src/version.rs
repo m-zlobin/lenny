@@ -1,1 +1,1 @@
-pub const VERSION: &str = "0.9.3-fork.1";
+pub const VERSION: &str = "0.9.4-fork.1";

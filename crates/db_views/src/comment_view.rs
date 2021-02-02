@@ -81,7 +81,7 @@ impl CommentView {
       creator_banned_from_community,
       subscribed,
       saved,
-      my_vote,
+      comment_like,
     ) = comment::table
       .find(comment_id)
       .inner_join(user_::table)
@@ -133,6 +133,14 @@ impl CommentView {
         comment_like::score.nullable(),
       ))
       .first::<CommentViewTuple>(conn)?;
+
+    // If a user is given, then my_vote, if None, should be 0, not null
+    // Necessary to differentiate between other user's votes
+    let my_vote = if my_user_id.is_some() && comment_like.is_none() {
+      Some(0)
+    } else {
+      comment_like
+    };
 
     Ok(CommentView {
       comment,
@@ -372,7 +380,7 @@ impl<'a> CommentQueryBuilder<'a> {
       SortType::Hot | SortType::Active => query
         .order_by(hot_rank(comment_aggregates::score, comment_aggregates::published).desc())
         .then_order_by(comment_aggregates::published.desc()),
-      SortType::New => query.order_by(comment::published.desc()),
+      SortType::New | SortType::MostComments => query.order_by(comment::published.desc()),
       SortType::TopAll => query.order_by(comment_aggregates::score.desc()),
       SortType::TopYear => query
         .filter(comment::published.gt(now - 1.years()))
