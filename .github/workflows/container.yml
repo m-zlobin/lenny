@@ -39,6 +39,15 @@ jobs:
           file: ./docker/prod/Dockerfile
           push: true
           tags: |
-            ghcr.io/innereq/containers/lenny:latest
+            ghcr.io/m-zlobin/containers/lenny:latest
           cache-from: type=local,src=/tmp/.buildx-cache
           cache-to: type=local,dest=/tmp/.buildx-cache
+          
+      - name: "Pull new Lenny container"
+        uses: appleboy/ssh-action@master
+        with:
+          host: ${{ secrets.SERVER_IP }}
+          username: ${{ secrets.USERNAME }}
+          key: ${{ secrets.SERVER_SSH_KEY }}
+          port: ${{ secrets.SERVER_PORT }}
+          script: bash ${{ secrets.SERVER_DESTINATION }}/scripts/update.sh
