@@ -46,8 +46,8 @@ jobs:
       - name: "Pull new Lenny container"
         uses: appleboy/ssh-action@master
         with:
-          host: ${{ secrets.SERVER_IP }}
-          username: ${{ secrets.USERNAME }}
-          key: ${{ secrets.SERVER_SSH_KEY }}
-          port: ${{ secrets.SERVER_PORT }}
-          script: bash ${{ secrets.SERVER_DESTINATION }}/scripts/update.sh
+          host: ${{ secrets.DEV_IP }}
+          username: ${{ secrets.DEV_USERNAME }}
+          key: ${{ secrets.DEV_SSH_KEY }}
+          port: ${{ secrets.DEV_PORT }}
+          script: bash ${{ secrets.DEV_DESTINATION }}/scripts/update.sh
